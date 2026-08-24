@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { BASE_PATH } from "./base-path";
 
 type Lang = "ru" | "ky" | "uz" | "zh";
+type Currency = "CNY" | "KGS" | "UZS" | "RUB";
 type LogoVariant = 1 | 2 | 3 | 4 | 5 | 6;
 
 const logoOptions: Array<{ id: LogoVariant; name: string; idea: string; fit: string; file: string }> = [
@@ -31,14 +32,14 @@ const copy = {
   },
   ky: {
     label: "Кыргызча",
-    nav: ["Категориялар", "Жаңы товарлар", "Логистика", "Сатып алуучуну коргоо"],
-    search: "Товарларды, фабрикаларды жана категорияларды издөө",
+    nav: ["Категориялар", "Жаңы өнүмдөр", "Логистика", "Сатып алуучуну коргоо"],
+    search: "Өнүмдөрдү, фабрикаларды жана категорияларды издөө",
     quote: "Сурамдар", eyebrow: "Кытайдан түз жеткирүү", title: "Арзан сатып алыңыз.\nКөбүрөөк пайда табыңыз.",
     subtitle: "Кытай фабрикаларынын дүң баалары, текшерилген жеткирүүчүлөр жана Кыргызстан менен Өзбекстанга темир жол аркылуу жеткирүү.",
-    cta: "Товар табуу", logistics: "Жеткирүүнү эсептөө", verified: "Жеткирүүчүлөр текшерилген",
+    cta: "Өнүм табуу", logistics: "Жеткирүүнү эсептөө", verified: "Жеткирүүчүлөр текшерилген",
     route: "Темир жол багыты", days: "12–18 күн", arrival: "Бишкекке / Ташкентке чейин",
-    market: "Сиздин рынокто популярдуу", marketSub: "Фабрика баасы · 10 даанадан баштап", all: "Баарын көрүү",
-    unit: "даана", moq: "Мин. заказ", pieces: "даана", orders: "заказ", categories: "Категориялар", country: "Рынок", rail: "Темир жол", chinaPrice: "Кытайдагы сатып алуу баасы", localPrice: "Жергиликтүү сатуу баасы",
+    market: "Сиздин базарда популярдуу", marketSub: "Фабрика баасы · 10 даанадан баштап", all: "Баарын көрүү",
+    unit: "даанасы", moq: "Эң аз буйрутма", pieces: "даана", orders: "буйрутма", categories: "Категориялар", country: "Базар", rail: "Темир жол", chinaPrice: "Кытайдагы сатып алуу баасы", localPrice: "Жергиликтүү сатуу баасы",
   },
   uz: {
     label: "O‘zbekcha",
@@ -60,6 +61,116 @@ const copy = {
     market: "当地市场热销", marketSub: "源头工厂价 · 最低 10 件起批", all: "查看全部", unit: "每件", moq: "起订量", pieces: "件", orders: "笔订单", categories: "商品分类", country: "目标市场", rail: "铁路运输", chinaPrice: "中国进货价", localPrice: "当地售价",
   },
 } as const;
+
+const inquiryCopy = {
+  ru: {
+    add: "Добавить в запрос", added: "Добавлено", list: "Запрос", title: "Получить точную цену с доставкой",
+    subtitle: "Выберите количество и оставьте номер — менеджер уточнит закупочную цену, доставку и расходы.", empty: "Добавьте товары, чтобы получить расчёт.",
+    quantity: "Количество", remove: "Удалить", destination: "Город доставки", phone: "Контактный телефон", whatsapp: "WhatsApp",
+    sameWhatsapp: "WhatsApp совпадает с контактным телефоном", email: "Эл. почта", emailHint: "Для получения полного коммерческого предложения",
+    preferred: "Предпочтительный способ связи", phoneFirst: "Телефон", whatsappFirst: "WhatsApp", emailFirst: "Почта", note: "Комментарий",
+    notePlaceholder: "Нужные модели, цвета, сроки или другие пожелания", submit: "Отправить запрос и ждать звонка",
+    response: "В рабочее время свяжемся с вами в течение 30 минут.", free: "Бесплатный расчёт · без обязательства заказывать",
+    success: "Запрос подготовлен. Мы свяжемся с вами по телефону.", close: "Закрыть", exchange: "Ориентировочный пересчёт",
+  },
+  ky: {
+    add: "Сурамга кошуу", added: "Кошулду", list: "Сурам", title: "Жеткирүү менен так бааны алыңыз",
+    subtitle: "Санын тандап, телефон номериңизди калтырыңыз — адис өнүмдү, жеткирүүнү жана чыгымдарды эсептейт.", empty: "Эсептөө үчүн өнүмдөрдү кошуңуз.",
+    quantity: "Саны", remove: "Өчүрүү", destination: "Жеткирүү шаары", phone: "Байланыш телефону", whatsapp: "WhatsApp",
+    sameWhatsapp: "WhatsApp номери байланыш телефону менен бирдей", email: "Электрондук дарек", emailHint: "Толук сунушту алуу үчүн",
+    preferred: "Байланыштын ыңгайлуу жолу", phoneFirst: "Телефон", whatsappFirst: "WhatsApp", emailFirst: "Электрондук дарек", note: "Кошумча маалымат",
+    notePlaceholder: "Модель, түс, мөөнөт же башка каалоолор", submit: "Сурам жөнөтүп, чалууну күтүү",
+    response: "Иш убактысында 30 мүнөттүн ичинде байланышабыз.", free: "Акысыз эсеп · сатып алуу милдеттүү эмес",
+    success: "Сурам даяр. Биз сизге телефон аркылуу байланышабыз.", close: "Жабуу", exchange: "Болжолдуу курс",
+  },
+  uz: {
+    add: "So‘rovga qo‘shish", added: "Qo‘shildi", list: "So‘rov", title: "Yetkazib berish bilan aniq narxni oling",
+    subtitle: "Miqdorni tanlang va telefon raqamingizni qoldiring — menejer mahsulot, yetkazish va xarajatlarni hisoblaydi.", empty: "Hisob-kitob olish uchun mahsulot qo‘shing.",
+    quantity: "Miqdor", remove: "O‘chirish", destination: "Yetkazib berish shahri", phone: "Aloqa telefoni", whatsapp: "WhatsApp",
+    sameWhatsapp: "WhatsApp raqami aloqa telefoni bilan bir xil", email: "E-pochta", emailHint: "To‘liq tijorat taklifini olish uchun",
+    preferred: "Afzal aloqa usuli", phoneFirst: "Telefon", whatsappFirst: "WhatsApp", emailFirst: "E-pochta", note: "Izoh",
+    notePlaceholder: "Model, rang, muddat yoki boshqa istaklar", submit: "So‘rov yuborish va qo‘ng‘iroqni kutish",
+    response: "Ish vaqtida 30 daqiqa ichida bog‘lanamiz.", free: "Bepul hisob-kitob · buyurtma majburiy emas",
+    success: "So‘rov tayyor. Siz bilan telefon orqali bog‘lanamiz.", close: "Yopish", exchange: "Taxminiy kurs",
+  },
+  zh: {
+    add: "加入询价单", added: "已加入", list: "询价单", title: "获取准确到货价",
+    subtitle: "选择采购数量并留下电话，采购经理将核算商品、物流及相关费用。", empty: "添加商品后即可获取采购报价。",
+    quantity: "采购数量", remove: "删除", destination: "收货城市", phone: "联系电话", whatsapp: "WhatsApp",
+    sameWhatsapp: "WhatsApp 与联系电话相同", email: "邮箱", emailHint: "用于接收完整报价单",
+    preferred: "优先联系方式", phoneFirst: "电话优先", whatsappFirst: "WhatsApp", emailFirst: "邮箱", note: "备注",
+    notePlaceholder: "需要的型号、颜色、交期或其他要求", submit: "提交询价，等待电话联系",
+    response: "工作时间内，我们将在 30 分钟内与您联系。", free: "免费报价 · 不产生订购义务",
+    success: "询价信息已准备，我们会优先通过电话与您联系。", close: "关闭", exchange: "参考汇率换算",
+  },
+} as const;
+
+const siteCopy = {
+  ru: {
+    brand: "ТОРГОВЛЯ С ЦЕНТРАЛЬНОЙ АЗИЕЙ", brandSub: "ПРЯМЫЕ ПОСТАВКИ", top: ["Закупочный центр Иу", "Железнодорожная линия Китай–Кыргызстан–Узбекистан", "Официальная проверка фабрик"],
+    stops: ["Китай", "Урумчи", "Бишкек", "Ташкент"], verifiedDetail: "100% подтверждено документами", china: "Китай", kgCountry: "Кыргызстан", uzCountry: "Узбекистан",
+    kgCity: "Бишкек", uzCity: "Ташкент", badge: "ХИТ", trend: "ТРЕНД", empty: "Товары не найдены", footerTagline: "Товары из Китая — новые возможности для бизнеса в Центральной Азии.", copyright: "© 2026 Торговля с Центральной Азией",
+    save: "Сохранить товар", logisticsNotice: "Расчёт доставки будет доступен на следующем этапе.", languageLabel: "Язык", currencyLabel: "Валюта", navLabel: "Основная навигация",
+  },
+  ky: {
+    brand: "БОРБОР АЗИЯ СООДАСЫ", brandSub: "ТҮЗ ЖЕТКИРҮҮ", top: ["Иу сатып алуу борбору", "Кытай–Кыргызстан–Өзбекстан темир жолу", "Фабрикаларды расмий текшерүү"],
+    stops: ["Кытай", "Үрүмчү", "Бишкек", "Ташкент"], verifiedDetail: "Документтер менен 100% тастыкталган", china: "Кытай", kgCountry: "Кыргызстан", uzCountry: "Өзбекстан",
+    kgCity: "Бишкек", uzCity: "Ташкент", badge: "МЫКТЫ", trend: "ТРЕНД", empty: "Товар табылган жок", footerTagline: "Кытайдын сапаттуу товарлары — Борбор Азиядагы жаңы бизнес мүмкүнчүлүктөрү.", copyright: "© 2026 Борбор Азия соодасы",
+    save: "Өнүмдү сактоо", logisticsNotice: "Жеткирүүнү эсептөө кийинки этапта жеткиликтүү болот.", languageLabel: "Тил", currencyLabel: "Акча бирдиги", navLabel: "Негизги багыттоо",
+  },
+  uz: {
+    brand: "MARKAZIY OSIYO SAVDOSI", brandSub: "TO‘G‘RIDAN-TO‘G‘RI YETKAZISH", top: ["Iu xarid markazi", "Xitoy–Qirg‘iziston–O‘zbekiston temir yo‘li", "Fabrikalarni rasmiy tekshirish"],
+    stops: ["Xitoy", "Urumchi", "Bishkek", "Toshkent"], verifiedDetail: "Hujjatlar bilan 100% tasdiqlangan", china: "Xitoy", kgCountry: "Qirg‘iziston", uzCountry: "O‘zbekiston",
+    kgCity: "Bishkek", uzCity: "Toshkent", badge: "OMMABOP", trend: "TREND", empty: "Mahsulot topilmadi", footerTagline: "Xitoyning sifatli mahsulotlari — Markaziy Osiyodagi yangi biznes imkoniyatlari.", copyright: "© 2026 Markaziy Osiyo savdosi",
+    save: "Mahsulotni saqlash", logisticsNotice: "Yetkazib berish hisobi keyingi bosqichda mavjud bo‘ladi.", languageLabel: "Til", currencyLabel: "Valyuta", navLabel: "Asosiy navigatsiya",
+  },
+  zh: {
+    brand: "中亚商机网", brandSub: "中国源头直供", top: ["义乌集采中心", "中吉乌铁路专线", "官方验厂"],
+    stops: ["中国", "乌鲁木齐", "比什凯克", "塔什干"], verifiedDetail: "100% 文件核验", china: "中国", kgCountry: "吉尔吉斯斯坦", uzCountry: "乌兹别克斯坦",
+    kgCity: "比什凯克", uzCity: "塔什干", badge: "热销", trend: "趋势", empty: "暂无匹配商品", footerTagline: "中国源头好货，通向中亚生意。", copyright: "© 2026 中亚商机网",
+    save: "收藏商品", logisticsNotice: "物流测算将在下一步采购流程中开放。", languageLabel: "语言", currencyLabel: "货币", navLabel: "主导航",
+  },
+} as const;
+
+const kyrgyzProductNames: Record<string, string> = {
+  "screen-protector": "Смартфон үчүн коргоочу айнек", "phone-case": "Тунук соккуга чыдамдуу кап", "usb-c-cable": "Өрүлгөн USB-C тез кубаттоо кабели",
+  "phone-stand": "Бүктөлүүчү үстөл телефон кармагычы", "car-holder": "Унаанын желдеткичине телефон кармагыч", "selfie-stick": "Штативдүү селфи таякчасы",
+  "cable-organizer": "Кабель коргоочу жана иреттегич топтом", "hair-set": "Чач кыскычтар жана резинкалар топтому", "makeup-sponge": "Макияж губкасы жана пуф топтому",
+  "curling-ribbon": "Жылуулуксуз чач тармалдатуучу лента", "nail-set": "Тырмак чаптамалары жана жасалма тырмактар", "scarf-clasp": "Жоолук үчүн магниттик илгичтер жана брошкалар",
+  "jewelry-box": "Саякаттык зер буюмдар кутусу", "adhesive-hooks": "Тешпей жабыштырылуучу илгичтер", "drain-strainer": "Суу агызгыч чыпкалар топтому",
+  "vacuum-bags": "Вакуумдук кысуучу баштыктар топтому", "drawer-organizer": "Тартма бөлгүч жана ич кийим иреттегич", "travel-organizer": "Бут кийим кабы жана саякат иреттегичтери",
+  "gap-strip": "Раковина жана меш үчүн силикон тилкелер", "car-towels": "Унаа үчүн микрофибра сүлгүлөр", "seat-organizer": "Унаа отургуч аралыгына иреттегич",
+  "sunshade": "Алдыңкы айнекке бүктөлүүчү күн калкалоочу чатыр", "frost-cover": "Алдыңкы айнекке кышкы кар капкак", "uv-set": "Күндөн коргоочу жеңдер жана бет кап",
+  "winter-gloves": "Сенсордук экранга кышкы мээлейлер", "lint-remover": "USB-C түк тазалагыч", "bag-sealer": "USB-C кичи пакет жапкыч",
+  "usb-fan": "Колго жана үстөлгө USB-C желдеткич", "sensor-light": "Кыймыл сенсорлуу магниттик чырак", "shoe-dryer": "PTC бут кийим кургаткыч",
+};
+
+const deliveryCities: Record<"kg" | "uz", Record<Lang, string[]>> = {
+  kg: {
+    ru: ["Бишкек", "Ош", "Каракол"], ky: ["Бишкек", "Ош", "Каракол"], uz: ["Bishkek", "O‘sh", "Qorako‘l"], zh: ["比什凯克", "奥什", "卡拉科尔"],
+  },
+  uz: {
+    ru: ["Ташкент", "Самарканд", "Андижан"], ky: ["Ташкент", "Самарканд", "Анжиян"], uz: ["Toshkent", "Samarqand", "Andijon"], zh: ["塔什干", "撒马尔罕", "安集延"],
+  },
+};
+
+const currencyOptions: Array<{ code: Currency; label: string; perCny: number; locale: string; digits: number }> = [
+  { code: "CNY", label: "CNY ¥", perCny: 1, locale: "zh-CN", digits: 2 },
+  { code: "KGS", label: "KGS", perCny: 12.2, locale: "ru-RU", digits: 0 },
+  { code: "UZS", label: "UZS", perCny: 1750, locale: "uz-UZ", digits: 0 },
+  { code: "RUB", label: "RUB ₽", perCny: 11.3, locale: "ru-RU", digits: 0 },
+];
+
+const priceNumber = (value: string) => Number(value.replace(/[^\d.]/g, ""));
+
+function formatCurrency(cnyValue: number, currency: Currency) {
+  const option = currencyOptions.find((item) => item.code === currency) ?? currencyOptions[0];
+  const value = cnyValue * option.perCny;
+  const formatted = new Intl.NumberFormat(option.locale, { maximumFractionDigits: option.digits, minimumFractionDigits: option.digits }).format(value);
+  if (currency === "CNY") return `¥ ${formatted}`;
+  if (currency === "RUB") return `₽ ${formatted}`;
+  return `${currency} ${formatted}`;
+}
 
 const productName = (ru: string, uz: string, zh: string) => ({ ru, ky: ru, uz, zh });
 
@@ -97,11 +208,11 @@ const products = [
 ];
 
 const categories = [
-  ["home", { ru: "Товары для дома", ky: "Үй товарлары", uz: "Uy-ro‘zg‘or", zh: "家居日用" }],
+  ["home", { ru: "Товары для дома", ky: "Үй буюмдары", uz: "Uy-ro‘zg‘or", zh: "家居日用" }],
   ["fashion", { ru: "Одежда и обувь", ky: "Кийим жана бут кийим", uz: "Kiyim va poyabzal", zh: "服装鞋靴" }],
   ["tools", { ru: "Инструменты", ky: "Куралдар", uz: "Asbob-uskunalar", zh: "五金工具" }],
   ["digital", { ru: "Электроника", ky: "Электроника", uz: "Elektronika", zh: "数码电器" }],
-  ["auto", { ru: "Автотовары", ky: "Авто товарлар", uz: "Avto tovarlar", zh: "汽车用品" }],
+  ["auto", { ru: "Автотовары", ky: "Унаа буюмдары", uz: "Avto tovarlar", zh: "汽车用品" }],
   ["beauty", { ru: "Красота", ky: "Сулуулук", uz: "Go‘zallik", zh: "个护美妆" }],
 ] as const;
 
@@ -116,10 +227,11 @@ function LogoMark({ variant }: { variant: LogoVariant }) {
   </svg>;
 }
 
-function Logo({ compact = false, variant = 1 }: { compact?: boolean; variant?: LogoVariant }) {
-  return <div className={`brand-lockup ${compact ? "compact" : ""}`} aria-label="中亚商机网">
+function Logo({ compact = false, variant = 1, lang = "zh" }: { compact?: boolean; variant?: LogoVariant; lang?: Lang }) {
+  const brand = siteCopy[lang];
+  return <div className={`brand-lockup ${compact ? "compact" : ""}`} aria-label={brand.brand}>
     <LogoMark variant={variant}/>
-    {!compact && <span className="brand-words"><strong>中亚商机网</strong><small>CENTRAL ASIA TRADE</small></span>}
+    {!compact && <span className="brand-words"><strong>{brand.brand}</strong><small>{brand.brandSub}</small></span>}
   </div>;
 }
 
@@ -213,22 +325,80 @@ function BrandGuide({ onClose, selected, onSelect }: { onClose: () => void; sele
 
 export default function Home() {
   const [lang, setLang] = useState<Lang>("ru");
+  const [currency, setCurrency] = useState<Currency>("KGS");
   const [market, setMarket] = useState<"kg" | "uz">("kg");
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
+  const [quoteItems, setQuoteItems] = useState<Record<string, number>>({});
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sameWhatsapp, setSameWhatsapp] = useState(true);
+  const [preferredContact, setPreferredContact] = useState<"phone" | "whatsapp" | "email">("phone");
+  const [submitted, setSubmitted] = useState(false);
   const [showBrand, setShowBrand] = useState(false);
   const [logoVariant, setLogoVariant] = useState<LogoVariant>(1);
   const t = copy[lang];
-  const shownProducts = useMemo(() => products.filter((p) => !query || p.name[lang].toLowerCase().includes(query.toLowerCase())), [query, lang]);
+  const iq = inquiryCopy[lang];
+  const s = siteCopy[lang];
+  const productLabel = (product: (typeof products)[number]) => lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang];
+  const shownProducts = useMemo(() => products.filter((product) => !query || (lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang]).toLowerCase().includes(query.toLowerCase())), [query, lang]);
+  const selectedProducts = products.filter((product) => quoteItems[product.kind]);
+  const quoteCount = selectedProducts.length;
+  const destinationOptions = deliveryCities[market][lang];
+
+  useEffect(() => {
+    document.documentElement.lang = lang === "zh" ? "zh-CN" : lang;
+    document.title = s.brand;
+  }, [lang, s.brand]);
+
+  useEffect(() => {
+    document.body.style.overflow = drawerOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [drawerOpen]);
+
+  const retailInCny = (product: (typeof products)[number]) => {
+    const sourceCurrency: Currency = market === "kg" ? "KGS" : "UZS";
+    const sourceRate = currencyOptions.find((item) => item.code === sourceCurrency)?.perCny ?? 1;
+    return priceNumber(product.retail[market]) / sourceRate;
+  };
+
+  const addToQuote = (product: (typeof products)[number]) => {
+    if (quoteItems[product.kind]) {
+      setDrawerOpen(true);
+      return;
+    }
+    setQuoteItems((current) => ({ ...current, [product.kind]: product.moq }));
+    setSubmitted(false);
+    if (quoteCount === 0) setDrawerOpen(true);
+  };
+
+  const updateQuantity = (kind: string, quantity: number, minimum: number) => {
+    setQuoteItems((current) => ({ ...current, [kind]: Math.max(minimum, quantity || minimum) }));
+    setSubmitted(false);
+  };
+
+  const removeFromQuote = (kind: string) => {
+    setQuoteItems((current) => {
+      const next = { ...current };
+      delete next[kind];
+      return next;
+    });
+    setSubmitted(false);
+  };
+
+  const submitInquiry = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitted(true);
+  };
 
   return <main className="market-shell">
-    <div className="top-strip"><span>义乌集采中心</span><i/><span>中吉乌铁路专线</span><i/><span>官方验厂</span><div className="strip-route"><b>中国</b><span>乌鲁木齐</span><span>比什凯克</span><span>塔什干</span></div></div>
+    <div className="top-strip"><span>{s.top[0]}</span><i/><span>{s.top[1]}</span><i/><span>{s.top[2]}</span><div className="strip-route"><b>{s.stops[0]}</b><span>{s.stops[1]}</span><span>{s.stops[2]}</span><span>{s.stops[3]}</span></div></div>
     <header className="site-header">
-      <Logo variant={logoVariant}/>
-      <nav aria-label="Primary navigation">{t.nav.map((item, i) => <a href={i === 0 ? "#categories" : i === 2 ? "#route" : "#products"} key={item}>{item}</a>)}</nav>
+      <Logo variant={logoVariant} lang={lang}/>
+      <nav aria-label={s.navLabel}>{t.nav.map((item, i) => <a href={i === 0 ? "#categories" : i === 2 ? "#route" : "#products"} key={item}>{item}</a>)}</nav>
       <div className="header-actions">
-        <label className="language-select"><span className="sr-only">Language</span><select value={lang} onChange={(e) => setLang(e.target.value as Lang)}>{(Object.keys(copy) as Lang[]).map((key) => <option key={key} value={key}>{copy[key].label}</option>)}</select></label>
-        <button className="quote-button" onClick={() => setNotice(lang === "zh" ? "询价单功能将在采购流程中启用" : "Раздел запросов откроется в процессе закупки")}><Icon name="cart"/>{t.quote}<span>3</span></button>
+        <label className="language-select"><span className="sr-only">{s.languageLabel}</span><select value={lang} onChange={(e) => { setLang(e.target.value as Lang); setNotice(""); }}>{(Object.keys(copy) as Lang[]).map((key) => <option key={key} value={key}>{copy[key].label}</option>)}</select></label>
+        <label className="currency-select"><span className="sr-only">{s.currencyLabel}</span><select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>{currencyOptions.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
+        <button className="quote-button" onClick={() => setDrawerOpen(true)} aria-expanded={drawerOpen} aria-controls="inquiry-drawer"><Icon name="cart"/>{iq.list}<span>{quoteCount}</span></button>
       </div>
     </header>
     {notice && <button className="toast" onClick={() => setNotice("")}>{notice}<b>×</b></button>}
@@ -237,28 +407,88 @@ export default function Home() {
       <aside className="category-panel" id="categories">
         <div className="panel-heading"><strong>{t.categories}</strong><span>☰</span></div>
         <div className="category-list">{categories.map(([icon, names]) => <button key={icon}><span className="category-icon"><Icon name={icon}/></span><span>{names[lang]}</span><b>›</b></button>)}</div>
-        <div className="buyer-note"><Icon name="shield"/><div><strong>{t.verified}</strong><span>100% документально</span></div></div>
+        <div className="buyer-note"><Icon name="shield"/><div><strong>{t.verified}</strong><span>{s.verifiedDetail}</span></div></div>
       </aside>
 
       <div className="hero" id="route">
         <div className="hero-copy"><span className="eyebrow"><i/>{t.eyebrow}</span><h1>{t.title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1><p>{t.subtitle}</p>
-          <div className="hero-actions"><a className="primary-cta" href="#products">{t.cta}<Icon name="arrow"/></a><button className="secondary-cta" onClick={() => setNotice(lang === "zh" ? "物流测算器已加入下一步产品流程" : "Калькулятор добавлен в следующий этап продукта")}>{t.logistics}</button></div>
+          <div className="hero-actions"><a className="primary-cta" href="#products">{t.cta}<Icon name="arrow"/></a><button className="secondary-cta" onClick={() => setNotice(s.logisticsNotice)}>{t.logistics}</button></div>
         </div>
         <div className="route-visual" aria-label={t.route}><div className="sun-disc"/><div className="route-card"><span>{t.route}</span><strong>{t.days}</strong><small>{t.arrival}</small></div>
           <svg viewBox="0 0 430 260" aria-hidden="true"><path className="land" d="M28 197c48-62 92-67 139-30 45-75 101-91 159-35 24-22 51-23 77-4v97H28Z"/><path className="rail" d="M32 214C139 189 237 189 405 151"/><path className="rail rail-two" d="M34 225c111-25 212-26 373-62"/><path className="track" d="m74 205 7 11m44-23 7 11m48-22 7 11m49-21 7 11m49-24 7 11m48-23 7 11"/><g className="train"><path d="M265 129h69l18 20-5 20-77 16-13-16Z"/><path d="M277 139h18v13h-22M302 139h23l11 13h-34Z"/><circle cx="280" cy="176" r="7"/><circle cx="330" cy="166" r="7"/></g></svg>
-          <div className="route-cities"><span className="china">中国</span><span className="kg">KG</span><span className="uz">UZ</span></div>
+          <div className="route-cities"><span className="china">{s.china}</span><span className="kg">KG</span><span className="uz">UZ</span></div>
         </div>
       </div>
     </section>
 
-    <section className="search-band"><div className="search-box"><Icon name="search"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search}/><button onClick={() => document.querySelector("#products")?.scrollIntoView({behavior:"smooth"})}>{t.cta}</button></div><div className="market-toggle"><span>{t.country}</span><button className={market === "kg" ? "active" : ""} onClick={() => setMarket("kg")}>🇰🇬 Кыргызстан</button><button className={market === "uz" ? "active" : ""} onClick={() => setMarket("uz")}>🇺🇿 O‘zbekiston</button></div></section>
+    <section className="search-band"><div className="search-box"><Icon name="search"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search}/><button onClick={() => document.querySelector("#products")?.scrollIntoView({behavior:"smooth"})}>{t.cta}</button></div><div className="market-toggle"><span>{t.country}</span><button className={market === "kg" ? "active" : ""} onClick={() => setMarket("kg")}>🇰🇬 {s.kgCountry}</button><button className={market === "uz" ? "active" : ""} onClick={() => setMarket("uz")}>🇺🇿 {s.uzCountry}</button></div></section>
 
     <section className="products-section" id="products">
-      <div className="section-title"><div><span>2026 · TREND</span><h2>{t.market}</h2><p>{t.marketSub}</p></div><a href="#products">{t.all}<Icon name="arrow"/></a></div>
-      <div className="product-grid">{shownProducts.map((product) => <article className="product-card" key={product.kind}><div className="product-image"><span className="product-badge">{market === "kg" ? "KG TOP" : "UZ TOP"}</span><img src={`${BASE_PATH}${product.image}`} alt={product.name[lang]}/><button aria-label="Save product">♡</button></div><div className="product-info"><h3>{product.name[lang]}</h3><div className="product-pricing"><div className="price-block purchase"><span>{t.chinaPrice}</span><strong>{product.cost}</strong></div><div className="price-block retail"><span>{t.localPrice}</span><strong>{product.retail[market]}</strong></div></div><div className="product-meta"><span>{t.moq} {product.moq} {t.pieces}</span><span>{product.orders} {t.orders}</span></div><div className="product-footer"><span><i/>{t.rail} {market === "kg" ? "→ Бишкек" : "→ Ташкент"}</span><button aria-label="Add to quote">+</button></div></div></article>)}
-        {shownProducts.length === 0 && <div className="empty-state">Ничего не найдено / 暂无匹配商品</div>}</div>
+      <div className="section-title"><div><span>2026 · {s.trend}</span><h2>{t.market}</h2><p>{t.marketSub}</p></div><a href="#products">{t.all}<Icon name="arrow"/></a></div>
+      <div className="product-grid">{shownProducts.map((product) => {
+        const isAdded = Boolean(quoteItems[product.kind]);
+        return <article className={`product-card ${isAdded ? "in-quote" : ""}`} key={product.kind}>
+          <div className="product-image"><span className="product-badge">{market === "kg" ? "KG" : "UZ"} {s.badge}</span><img src={`${BASE_PATH}${product.image}`} alt={productLabel(product)}/><button aria-label={s.save}>♡</button></div>
+          <div className="product-info">
+            <h3>{productLabel(product)}</h3>
+            <div className="product-pricing">
+              <div className="price-block purchase"><span>{t.chinaPrice}</span><strong>{formatCurrency(priceNumber(product.cost), currency)}</strong></div>
+              <div className="price-block retail"><span>{t.localPrice}</span><strong>{formatCurrency(retailInCny(product), currency)}</strong></div>
+            </div>
+            <div className="product-meta"><span>{t.moq} {product.moq} {t.pieces}</span><span>{product.orders} {t.orders}</span></div>
+            <div className="product-footer">
+              <span><i/>{t.rail} → {market === "kg" ? s.kgCity : s.uzCity}</span>
+              <button className={isAdded ? "added" : ""} onClick={() => addToQuote(product)} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button>
+            </div>
+          </div>
+        </article>;
+      })}
+        {shownProducts.length === 0 && <div className="empty-state">{s.empty}</div>}</div>
     </section>
     </>}
-    <footer><Logo variant={logoVariant}/><p>中国源头好货，通向中亚生意。</p><span>© 2026 中亚商机网</span></footer>
+
+    {quoteCount > 0 && <button className={`quote-tab ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen((open) => !open)} aria-label={`${iq.list}: ${quoteCount}`}>
+      <Icon name="cart"/><span>{iq.list}</span><b>{quoteCount}</b>
+    </button>}
+
+    {drawerOpen && <button className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-label={iq.close}/>}
+    <aside id="inquiry-drawer" className={`inquiry-drawer ${drawerOpen ? "open" : ""}`} role="dialog" aria-modal="true" aria-labelledby="inquiry-title" aria-hidden={!drawerOpen}>
+      <header className="drawer-header">
+        <div><span>{iq.list} · {quoteCount}</span><h2 id="inquiry-title">{iq.title}</h2><p>{iq.subtitle}</p></div>
+        <button onClick={() => setDrawerOpen(false)} aria-label={iq.close}>×</button>
+      </header>
+
+      {quoteCount === 0 ? <div className="drawer-empty"><Icon name="cart"/><p>{iq.empty}</p><button onClick={() => { setDrawerOpen(false); document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" }); }}>{t.cta}</button></div> : <>
+        <div className="inquiry-products">
+          {selectedProducts.map((product) => <article key={product.kind}>
+            <img src={`${BASE_PATH}${product.image}`} alt=""/>
+            <div className="inquiry-product-copy">
+              <h3>{productLabel(product)}</h3>
+              <span>{formatCurrency(priceNumber(product.cost), currency)} / {t.pieces}</span>
+              <label>{iq.quantity}<input type="number" min={product.moq} step="1" value={quoteItems[product.kind]} onChange={(event) => updateQuantity(product.kind, Number(event.target.value), product.moq)}/></label>
+            </div>
+            <div className="inquiry-product-side"><strong>{formatCurrency(priceNumber(product.cost) * quoteItems[product.kind], currency)}</strong><button onClick={() => removeFromQuote(product.kind)}>{iq.remove}</button></div>
+          </article>)}
+          <p className="exchange-note">{iq.exchange} · {currency}</p>
+        </div>
+
+        <form className="contact-form" onSubmit={submitInquiry}>
+          <label className="field full"><span>{iq.destination}</span><select name="destination" defaultValue={destinationOptions[0]}>{destinationOptions.map((city) => <option key={city}>{city}</option>)}</select></label>
+          <label className="field full"><span>{iq.phone} *</span><div className="phone-field"><select name="phoneCountryCode" key={market} defaultValue={market === "kg" ? "+996" : "+998"}><option>+996</option><option>+998</option><option>+7</option><option>+86</option></select><input name="phone" type="tel" inputMode="tel" autoComplete="tel" required placeholder="000 000 000"/></div></label>
+          <label className="check-field full"><input type="checkbox" checked={sameWhatsapp} onChange={(event) => setSameWhatsapp(event.target.checked)}/><span>{iq.sameWhatsapp}</span></label>
+          {!sameWhatsapp && <label className="field full"><span>{iq.whatsapp}</span><div className="phone-field"><select name="whatsappCountryCode" defaultValue={market === "kg" ? "+996" : "+998"}><option>+996</option><option>+998</option><option>+7</option><option>+86</option></select><input name="whatsapp" type="tel" inputMode="tel" placeholder="000 000 000"/></div></label>}
+          <label className="field full"><span>{iq.email}</span><input name="email" type="email" autoComplete="email" placeholder="name@company.com"/><small>{iq.emailHint}</small></label>
+          <fieldset className="contact-preference full"><legend>{iq.preferred}</legend><div>
+            {(["phone", "whatsapp", "email"] as const).map((method) => <button type="button" key={method} className={preferredContact === method ? "active" : ""} onClick={() => setPreferredContact(method)}>{method === "phone" ? iq.phoneFirst : method === "whatsapp" ? iq.whatsappFirst : iq.emailFirst}</button>)}
+          </div><input type="hidden" name="preferredContact" value={preferredContact}/></fieldset>
+          <label className="field full"><span>{iq.note}</span><textarea name="note" rows={3} placeholder={iq.notePlaceholder}/></label>
+          <button className="submit-inquiry full" type="submit">{iq.submit}<Icon name="arrow"/></button>
+          <p className="response-note full">{iq.response}<span>{iq.free}</span></p>
+          {submitted && <div className="inquiry-success full" role="status">✓ {iq.success}</div>}
+        </form>
+      </>}
+    </aside>
+
+    <footer><Logo variant={logoVariant} lang={lang}/><p>{s.footerTagline}</p><span>{s.copyright}</span></footer>
   </main>;
 }
