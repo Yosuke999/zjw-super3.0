@@ -26,4 +26,3 @@ npm run build
 ```
 
 项目使用 Next.js 静态导出，构建结果位于 `out/`。推送到 `main` 后，GitHub Actions 会自动构建并部署 GitHub Pages。
-
