@@ -5,6 +5,7 @@ import { BASE_PATH } from "./base-path";
 
 type Lang = "ru" | "ky" | "uz" | "zh";
 type Currency = "CNY" | "KGS" | "UZS" | "RUB";
+type CategoryId = "home" | "fashion" | "tools" | "digital" | "auto" | "beauty";
 type LogoVariant = 1 | 2 | 3 | 4 | 5 | 6;
 
 const logoOptions: Array<{ id: LogoVariant; name: string; idea: string; fit: string; file: string }> = [
@@ -207,6 +208,17 @@ const products = [
   { name: productName("PTC-сушилка для обуви", "PTC poyabzal quritgichi", "PTC恒温烘鞋器"), image: "/products/30-ptc-shoe-dryer.jpg", cost: "¥ 28.50", retail: { kg: "2 850 сом", uz: "395 000 so‘m" }, moq: 20, orders: 584, kind: "shoe-dryer" },
 ];
 
+const productCategories: Record<string, CategoryId> = {
+  "screen-protector": "digital", "phone-case": "digital", "usb-c-cable": "digital", "phone-stand": "digital",
+  "car-holder": "auto", "selfie-stick": "digital", "cable-organizer": "digital",
+  "hair-set": "beauty", "makeup-sponge": "beauty", "curling-ribbon": "beauty", "nail-set": "beauty",
+  "scarf-clasp": "fashion", "jewelry-box": "fashion",
+  "adhesive-hooks": "home", "drain-strainer": "home", "vacuum-bags": "home", "drawer-organizer": "home", "travel-organizer": "home", "gap-strip": "home",
+  "car-towels": "auto", "seat-organizer": "auto", "sunshade": "auto", "frost-cover": "auto",
+  "uv-set": "fashion", "winter-gloves": "fashion",
+  "lint-remover": "tools", "bag-sealer": "tools", "usb-fan": "digital", "sensor-light": "digital", "shoe-dryer": "tools",
+};
+
 const categories = [
   ["home", { ru: "Товары для дома", ky: "Үй буюмдары", uz: "Uy-ro‘zg‘or", zh: "家居日用" }],
   ["fashion", { ru: "Одежда и обувь", ky: "Кийим жана бут кийим", uz: "Kiyim va poyabzal", zh: "服装鞋靴" }],
@@ -327,6 +339,7 @@ export default function Home() {
   const [lang, setLang] = useState<Lang>("ru");
   const [currency, setCurrency] = useState<Currency>("KGS");
   const [market, setMarket] = useState<"kg" | "uz">("kg");
+  const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
   const [quoteItems, setQuoteItems] = useState<Record<string, number>>({});
@@ -340,7 +353,12 @@ export default function Home() {
   const iq = inquiryCopy[lang];
   const s = siteCopy[lang];
   const productLabel = (product: (typeof products)[number]) => lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang];
-  const shownProducts = useMemo(() => products.filter((product) => !query || (lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang]).toLowerCase().includes(query.toLowerCase())), [query, lang]);
+  const shownProducts = useMemo(() => products.filter((product) => {
+    const matchesCategory = !selectedCategory || productCategories[product.kind] === selectedCategory;
+    const matchesQuery = !query || (lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang]).toLowerCase().includes(query.toLowerCase());
+    return matchesCategory && matchesQuery;
+  }), [query, lang, selectedCategory]);
+  const activeCategory = categories.find(([id]) => id === selectedCategory);
   const selectedProducts = products.filter((product) => quoteItems[product.kind]);
   const quoteCount = selectedProducts.length;
   const destinationOptions = deliveryCities[market][lang];
@@ -404,11 +422,7 @@ export default function Home() {
     {notice && <button className="toast" onClick={() => setNotice("")}>{notice}<b>×</b></button>}
     {showBrand ? <BrandGuide onClose={() => setShowBrand(false)} selected={logoVariant} onSelect={setLogoVariant}/> : <>
     <section className="workspace">
-      <aside className="category-panel" id="categories">
-        <div className="panel-heading"><strong>{t.categories}</strong><span>☰</span></div>
-        <div className="category-list">{categories.map(([icon, names]) => <button key={icon}><span className="category-icon"><Icon name={icon}/></span><span>{names[lang]}</span><b>›</b></button>)}</div>
-        <div className="buyer-note"><Icon name="shield"/><div><strong>{t.verified}</strong><span>{s.verifiedDetail}</span></div></div>
-      </aside>
+      <div className="workspace-reserved" aria-hidden="true"/>
 
       <div className="hero" id="route">
         <div className="hero-copy"><span className="eyebrow"><i/>{t.eyebrow}</span><h1>{t.title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1><p>{t.subtitle}</p>
@@ -423,8 +437,24 @@ export default function Home() {
 
     <section className="search-band"><div className="search-box"><Icon name="search"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search}/><button onClick={() => document.querySelector("#products")?.scrollIntoView({behavior:"smooth"})}>{t.cta}</button></div><div className="market-toggle"><span>{t.country}</span><button className={market === "kg" ? "active" : ""} onClick={() => setMarket("kg")}>🇰🇬 {s.kgCountry}</button><button className={market === "uz" ? "active" : ""} onClick={() => setMarket("uz")}>🇺🇿 {s.uzCountry}</button></div></section>
 
+    <div className="mobile-category-filter" aria-label={t.categories}>
+      <button className={!selectedCategory ? "active" : ""} onClick={() => setSelectedCategory(null)}>{t.all}<b>{products.length}</b></button>
+      {categories.map(([icon, names]) => <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => setSelectedCategory(icon)}>{names[lang]}<b>{products.filter((product) => productCategories[product.kind] === icon).length}</b></button>)}
+    </div>
+
     <section className="products-section" id="products">
-      <div className="section-title"><div><span>2026 · {s.trend}</span><h2>{t.market}</h2><p>{t.marketSub}</p></div><a href="#products">{t.all}<Icon name="arrow"/></a></div>
+      <div className="section-title"><div><span>2026 · {s.trend}</span><h2>{activeCategory ? activeCategory[1][lang] : t.market}</h2><p>{t.marketSub}</p></div><button onClick={() => setSelectedCategory(null)}>{t.all}<Icon name="arrow"/></button></div>
+      <div className="catalog-layout">
+      <aside className="category-panel" id="categories">
+        <div className="panel-heading"><strong>{t.categories}</strong><button onClick={() => setSelectedCategory(null)} aria-label={t.all}>☰</button></div>
+        <div className="category-list">{categories.map(([icon, names]) => {
+          const count = products.filter((product) => productCategories[product.kind] === icon).length;
+          return <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => setSelectedCategory((current) => current === icon ? null : icon)} aria-pressed={selectedCategory === icon}>
+            <span className="category-icon"><Icon name={icon}/></span><span>{names[lang]}</span><b><em>{count}</em>›</b>
+          </button>;
+        })}</div>
+        <div className="buyer-note"><Icon name="shield"/><div><strong>{t.verified}</strong><span>{s.verifiedDetail}</span></div></div>
+      </aside>
       <div className="product-grid">{shownProducts.map((product) => {
         const isAdded = Boolean(quoteItems[product.kind]);
         return <article className={`product-card ${isAdded ? "in-quote" : ""}`} key={product.kind}>
@@ -444,6 +474,7 @@ export default function Home() {
         </article>;
       })}
         {shownProducts.length === 0 && <div className="empty-state">{s.empty}</div>}</div>
+      </div>
     </section>
     </>}
 
