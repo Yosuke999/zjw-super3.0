@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import './globals.css';
 
-const title = '中亚商机网｜中国源头好货直达中亚';
-const description = '连接中国优质工厂与中亚批发商的一站式跨境采购平台。';
+const title = '中亚商机网｜中国商品直达中亚';
+const description = '面向吉尔吉斯斯坦与乌兹别克斯坦商贩的中国源头商品采购平台。';
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -16,14 +16,14 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
-    openGraph: { title, description, type: 'website', locale: 'zh_CN', images: [{ url: socialImage, width: 1731, height: 909, alt: '中亚商机网——中国源头好货，直达中亚' }] },
+    openGraph: { title, description: '中国源头好货，通向中亚生意。', type: 'website', locale: 'ru_RU', images: [{ url: socialImage, width: 1731, height: 909, alt: '中亚商机网——中国源头好货，直达中亚' }] },
     twitter: { card: 'summary_large_image', title, description, images: [socialImage] },
   };
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="ru">
       <body>{children}</body>
     </html>
   );
