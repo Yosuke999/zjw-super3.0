@@ -133,6 +133,49 @@ const siteCopy = {
   },
 } as const;
 
+const processCopy = {
+  ru: {
+    eyebrow: "КАК ЭТО РАБОТАЕТ", title: "От выбранного товара до доставки", subtitle: "Один менеджер сопровождает запрос от проверки фабрики до прибытия груза в ваш город.",
+    steps: [
+      ["Выберите товары", "Добавьте интересующие позиции в запрос и укажите нужное количество."],
+      ["Оставьте контакты", "Укажите телефон, WhatsApp или почту — приоритет остаётся за звонком."],
+      ["Подтвердите расчёт", "Мы уточним цену фабрики, доставку и сопутствующие расходы."],
+      ["Получите товар", "После подтверждения заказ отправляется железной дорогой в ваш город."],
+    ],
+    choose: "Выбрать товары", quote: "Получить расчёт", facts: ["Проверенные поставщики", "Расчёт до оплаты", "12–18 дней в пути"],
+  },
+  ky: {
+    eyebrow: "КАНТИП ИШТЕЙТ", title: "Өнүм тандоодон жеткирүүгө чейин", subtitle: "Бир адис фабриканы текшерүүдөн тартып жүк шаарыңызга жеткенге чейин сурамды коштойт.",
+    steps: [
+      ["Өнүмдөрдү тандаңыз", "Керектүү өнүмдөрдү сурамга кошуп, санын көрсөтүңүз."],
+      ["Байланыш калтырыңыз", "Телефон, WhatsApp же электрондук даректи көрсөтүңүз — биринчи кезекте чалабыз."],
+      ["Эсепти ырастаңыз", "Фабрика баасын, жеткирүүнү жана кошумча чыгымдарды тактайбыз."],
+      ["Жүктү алыңыз", "Ырасталгандан кийин жүк темир жол менен шаарыңызга жөнөтүлөт."],
+    ],
+    choose: "Өнүм тандоо", quote: "Эсеп алуу", facts: ["Текшерилген жеткирүүчүлөр", "Төлөөгө чейин эсеп", "Жолдо 12–18 күн"],
+  },
+  uz: {
+    eyebrow: "QANDAY ISHLAYDI", title: "Mahsulot tanlashdan yetkazishgacha", subtitle: "Bitta menejer fabrikani tekshirishdan yuk shahringizga yetib kelguniga qadar so‘rovni kuzatib boradi.",
+    steps: [
+      ["Mahsulotlarni tanlang", "Kerakli mahsulotlarni so‘rovga qo‘shing va miqdorini ko‘rsating."],
+      ["Aloqa qoldiring", "Telefon, WhatsApp yoki e-pochtani kiriting — birinchi navbatda qo‘ng‘iroq qilamiz."],
+      ["Hisobni tasdiqlang", "Fabrika narxi, yetkazish va qo‘shimcha xarajatlarni aniqlaymiz."],
+      ["Yukni qabul qiling", "Tasdiqlangandan so‘ng buyurtma temir yo‘l orqali shahringizga yuboriladi."],
+    ],
+    choose: "Mahsulot tanlash", quote: "Hisob-kitob olish", facts: ["Tekshirilgan yetkazib beruvchilar", "To‘lovdan oldin hisob", "Yo‘lda 12–18 kun"],
+  },
+  zh: {
+    eyebrow: "采购流程", title: "从选中商品，到货物抵达", subtitle: "一位采购经理全程跟进，从核验工厂、确认报价到货物抵达你的城市。",
+    steps: [
+      ["选择商品", "把感兴趣的商品加入询价单，并填写预计采购数量。"],
+      ["留下联系方式", "填写电话、WhatsApp 或邮箱，我们将优先电话沟通。"],
+      ["确认完整报价", "我们核实工厂价格、运输方案和相关费用。"],
+      ["铁路运输到货", "确认采购后安排铁路运输，货物送达你的城市。"],
+    ],
+    choose: "选择商品", quote: "获取采购报价", facts: ["供应商文件核验", "付款前确认费用", "铁路运输约 12–18 天"],
+  },
+} as const;
+
 const kyrgyzProductNames: Record<string, string> = {
   "screen-protector": "Смартфон үчүн коргоочу айнек", "phone-case": "Тунук соккуга чыдамдуу кап", "usb-c-cable": "Өрүлгөн USB-C тез кубаттоо кабели",
   "phone-stand": "Бүктөлүүчү үстөл телефон кармагычы", "car-holder": "Унаанын желдеткичине телефон кармагыч", "selfie-stick": "Штативдүү селфи таякчасы",
@@ -352,6 +395,7 @@ export default function Home() {
   const t = copy[lang];
   const iq = inquiryCopy[lang];
   const s = siteCopy[lang];
+  const pc = processCopy[lang];
   const productLabel = (product: (typeof products)[number]) => lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang];
   const shownProducts = useMemo(() => products.filter((product) => {
     const matchesCategory = !selectedCategory || productCategories[product.kind] === selectedCategory;
@@ -474,6 +518,20 @@ export default function Home() {
         </article>;
       })}
         {shownProducts.length === 0 && <div className="empty-state">{s.empty}</div>}</div>
+      </div>
+    </section>
+
+    <section className="process-section" id="process">
+      <header className="process-heading"><span>{pc.eyebrow}</span><h2>{pc.title}</h2><p>{pc.subtitle}</p></header>
+      <div className="process-steps">
+        {pc.steps.map(([title, description], index) => <article key={title}>
+          <div><b>{String(index + 1).padStart(2, "0")}</b><i/></div>
+          <h3>{title}</h3><p>{description}</p>
+        </article>)}
+      </div>
+      <div className="process-action">
+        <div>{pc.facts.map((fact) => <span key={fact}><i/> {fact}</span>)}</div>
+        <button onClick={() => quoteCount > 0 ? setDrawerOpen(true) : document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" })}>{quoteCount > 0 ? pc.quote : pc.choose}<Icon name="arrow"/></button>
       </div>
     </section>
     </>}
