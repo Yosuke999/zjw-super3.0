@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import VersionDock from "./version-dock";
 import { BASE_PATH } from "./base-path";
 
 type Lang = "ru" | "ky" | "uz" | "zh";
@@ -233,8 +232,6 @@ export default function Home() {
         {shownProducts.length === 0 && <div className="empty-state">Ничего не найдено / 暂无匹配商品</div>}</div>
     </section>
     </>}
-    <VersionDock active={1}/>
     <footer><Logo variant={logoVariant}/><p>中国源头好货，通向中亚生意。</p><span>© 2026 中亚商机网</span></footer>
   </main>;
 }
-
