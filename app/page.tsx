@@ -199,7 +199,6 @@ export default function Home() {
       <Logo variant={logoVariant}/>
       <nav aria-label="Primary navigation">{t.nav.map((item, i) => <a href={i === 0 ? "#categories" : i === 2 ? "#route" : "#products"} key={item}>{item}</a>)}</nav>
       <div className="header-actions">
-        <button className={`vi-button ${showBrand ? "active" : ""}`} onClick={() => setShowBrand(!showBrand)}>Logo 候选 · 6</button>
         <label className="language-select"><span className="sr-only">Language</span><select value={lang} onChange={(e) => setLang(e.target.value as Lang)}>{(Object.keys(copy) as Lang[]).map((key) => <option key={key} value={key}>{copy[key].label}</option>)}</select></label>
         <button className="quote-button" onClick={() => setNotice(lang === "zh" ? "询价单功能将在采购流程中启用" : "Раздел запросов откроется в процессе закупки")}><Icon name="cart"/>{t.quote}<span>3</span></button>
       </div>
