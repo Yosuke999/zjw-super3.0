@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { BASE_PATH } from "./base-path";
 
@@ -263,7 +264,7 @@ const logisticsNews = [
   },
   {
     id: "middle-corridor", date: "2026-05-15", image: "/news/torugart-road.jpg",
-    sourceUrl: "https://www.digital.gov.uz/en/mfa/news/view/166841",
+    sourceUrl: "https://gov.uz/en/mfa/news/view/166841",
     photoUrl: "https://commons.wikimedia.org/wiki/File:2015-09-09-092043_-_Zum_Torugart-Pass.jpg",
     tag: { ru: "КОРИДОР", ky: "КОРИДОР", uz: "YO‘LAK", zh: "通道" },
     title: {
@@ -613,6 +614,7 @@ export default function Home() {
   const [trustSlide, setTrustSlide] = useState(0);
   const [trustPaused, setTrustPaused] = useState(false);
   const [activeNewsId, setActiveNewsId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(9);
   const t = copy[lang];
   const iq = inquiryCopy[lang];
   const s = siteCopy[lang];
@@ -620,13 +622,17 @@ export default function Home() {
   const tc = trustStoryCopy[lang];
   const hc = heroComparisonCopy[lang];
   const nc = newsCopy[lang];
+  const detailLabel = { ru: "Подробнее", ky: "Толугураак", uz: "Batafsil", zh: "查看详情" }[lang];
+  const loadMoreLabel = { ru: "Показать ещё", ky: "Дагы көрсөтүү", uz: "Yana ko‘rsatish", zh: "加载更多" }[lang];
+  const showingLabel = { ru: "Показано", ky: "Көрсөтүлдү", uz: "Ko‘rsatildi", zh: "已显示" }[lang];
   const productLabel = (product: (typeof products)[number]) => lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang];
   const heroProducts = useMemo(() => heroProductKinds.map((kind) => products.find((product) => product.kind === kind)).filter((product): product is (typeof products)[number] => Boolean(product)), []);
-  const shownProducts = useMemo(() => products.filter((product) => {
+  const filteredProducts = useMemo(() => products.filter((product) => {
     const matchesCategory = !selectedCategory || productCategories[product.kind] === selectedCategory;
     const matchesQuery = !query || (lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang]).toLowerCase().includes(query.toLowerCase());
     return matchesCategory && matchesQuery;
   }), [query, lang, selectedCategory]);
+  const shownProducts = filteredProducts.slice(0, visibleCount);
   const activeCategory = categories.find(([id]) => id === selectedCategory);
   const selectedProducts = products.filter((product) => quoteItems[product.kind]);
   const quoteCount = selectedProducts.length;
@@ -635,8 +641,7 @@ export default function Home() {
 
   useEffect(() => {
     document.documentElement.lang = lang === "zh" ? "zh-CN" : lang;
-    document.title = s.brand;
-  }, [lang, s.brand]);
+  }, [lang]);
 
   useEffect(() => {
     document.body.style.overflow = drawerOpen ? "hidden" : "";
@@ -676,14 +681,51 @@ export default function Home() {
   const heroCostCny = heroProduct ? priceNumber(heroProduct.cost) : 0;
   const heroGapCny = Math.max(0, heroRetailCny - heroCostCny);
 
-  const addToQuote = (product: (typeof products)[number]) => {
+  const animateProductToQuote = (source: HTMLElement | null) => {
+    if (!source || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const sourceRect = source.getBoundingClientRect();
+
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>(".quote-tab");
+      if (!target) return;
+      const targetRect = target.getBoundingClientRect();
+      const flyer = source.cloneNode(true) as HTMLElement;
+      flyer.className = "product-card quote-flyer";
+      flyer.setAttribute("aria-hidden", "true");
+      flyer.style.left = `${sourceRect.left}px`;
+      flyer.style.top = `${sourceRect.top}px`;
+      flyer.style.width = `${sourceRect.width}px`;
+      flyer.style.height = `${sourceRect.height}px`;
+      document.body.appendChild(flyer);
+
+      const dx = targetRect.left + targetRect.width / 2 - (sourceRect.left + sourceRect.width / 2);
+      const dy = targetRect.top + targetRect.height / 2 - (sourceRect.top + sourceRect.height / 2);
+      const finalScale = Math.max(.08, Math.min(.16, targetRect.width / sourceRect.width));
+      const flight = flyer.animate([
+        { transform: "translate3d(0,0,0) scale(1)", opacity: 1, offset: 0 },
+        { transform: `translate3d(${dx * .68}px,${dy * .48 - 34}px,0) scale(.48) rotate(2deg)`, opacity: .88, offset: .58 },
+        { transform: `translate3d(${dx}px,${dy}px,0) scale(${finalScale}) rotate(5deg)`, opacity: .08, offset: 1 },
+      ], { duration: 720, easing: "cubic-bezier(.22,.8,.24,1)", fill: "forwards" });
+
+      flight.finished.then(() => {
+        flyer.remove();
+        target.animate([
+          { transform: "translateX(0) scale(1)" },
+          { transform: "translateX(-4px) scale(1.13)" },
+          { transform: "translateX(0) scale(1)" },
+        ], { duration: 300, easing: "cubic-bezier(.2,.8,.3,1)" });
+      }).catch(() => flyer.remove());
+    }));
+  };
+
+  const addToQuote = (product: (typeof products)[number], source: HTMLElement | null = null) => {
     if (quoteItems[product.kind]) {
       setDrawerOpen(true);
       return;
     }
     setQuoteItems((current) => ({ ...current, [product.kind]: product.moq }));
     setSubmitted(false);
-    if (quoteCount === 0) setDrawerOpen(true);
+    animateProductToQuote(source);
   };
 
   const updateQuantity = (kind: string, quantity: number, minimum: number) => {
@@ -711,9 +753,8 @@ export default function Home() {
       <Logo variant={logoVariant} lang={lang}/>
       <nav aria-label={s.navLabel}>{t.nav.map((item, i) => <a href={i === 0 ? "#categories" : i === 2 ? "#route" : "#products"} key={item}>{item}</a>)}</nav>
       <div className="header-actions">
-        <label className="language-select" data-code={lang === "zh" ? "中" : lang.toUpperCase()}><span className="sr-only">{s.languageLabel}</span><select value={lang} onChange={(e) => { setLang(e.target.value as Lang); setNotice(""); }}>{(Object.keys(copy) as Lang[]).map((key) => <option key={key} value={key}>{copy[key].label}</option>)}</select></label>
+        <label className="language-select" data-code={lang === "zh" ? "中" : lang.toUpperCase()}><span className="sr-only">{s.languageLabel}</span><select value={lang} onChange={(e) => { setLang(e.target.value as Lang); setVisibleCount(9); setNotice(""); }}>{(Object.keys(copy) as Lang[]).map((key) => <option key={key} value={key}>{copy[key].label}</option>)}</select></label>
         <label className="currency-select"><span className="sr-only">{s.currencyLabel}</span><select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>{currencyOptions.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
-        <button className="quote-button" onClick={() => setDrawerOpen(true)} aria-expanded={drawerOpen} aria-controls="inquiry-drawer"><Icon name="cart"/>{iq.list}<span>{quoteCount}</span></button>
       </div>
     </header>
     {notice && <button className="toast" onClick={() => setNotice("")}>{notice}<b>×</b></button>}
@@ -799,21 +840,21 @@ export default function Home() {
       </div>
     </section>
 
-    <section className="search-band"><div className="search-box"><Icon name="search"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search}/><button onClick={() => document.querySelector("#products")?.scrollIntoView({behavior:"smooth"})}>{t.cta}</button></div><div className="market-toggle"><span>{t.country}</span><button className={market === "kg" ? "active" : ""} onClick={() => setMarket("kg")}>🇰🇬 {s.kgCountry}</button><button className={market === "uz" ? "active" : ""} onClick={() => setMarket("uz")}>🇺🇿 {s.uzCountry}</button></div></section>
+    <section className="search-band"><div className="search-box"><Icon name="search"/><input value={query} onChange={(e) => { setQuery(e.target.value); setVisibleCount(9); }} placeholder={t.search}/><button onClick={() => document.querySelector("#products")?.scrollIntoView({behavior:"smooth"})}>{t.cta}</button></div><div className="market-toggle"><span>{t.country}</span><button className={market === "kg" ? "active" : ""} onClick={() => setMarket("kg")}>🇰🇬 {s.kgCountry}</button><button className={market === "uz" ? "active" : ""} onClick={() => setMarket("uz")}>🇺🇿 {s.uzCountry}</button></div></section>
 
     <div className="mobile-category-filter" aria-label={t.categories}>
-      <button className={!selectedCategory ? "active" : ""} onClick={() => setSelectedCategory(null)}>{t.all}<b>{products.length}</b></button>
-      {categories.map(([icon, names]) => <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => setSelectedCategory(icon)}>{names[lang]}<b>{products.filter((product) => productCategories[product.kind] === icon).length}</b></button>)}
+      <button className={!selectedCategory ? "active" : ""} onClick={() => { setSelectedCategory(null); setVisibleCount(9); }}>{t.all}<b>{products.length}</b></button>
+      {categories.map(([icon, names]) => <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => { setSelectedCategory(icon); setVisibleCount(9); }}>{names[lang]}<b>{products.filter((product) => productCategories[product.kind] === icon).length}</b></button>)}
     </div>
 
     <section className="products-section" id="products">
       <div className="section-title"><div><span>2026 · {s.trend}</span><h2>{activeCategory ? activeCategory[1][lang] : t.market}</h2><p>{t.marketSub}</p></div></div>
       <div className="catalog-layout">
       <aside className="category-panel" id="categories">
-        <div className="panel-heading"><strong>{t.categories}</strong><button onClick={() => setSelectedCategory(null)} aria-label={t.all}>☰</button></div>
+        <div className="panel-heading"><strong>{t.categories}</strong><button onClick={() => { setSelectedCategory(null); setVisibleCount(9); }} aria-label={t.all}>☰</button></div>
         <div className="category-list">{categories.map(([icon, names]) => {
           const count = products.filter((product) => productCategories[product.kind] === icon).length;
-          return <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => setSelectedCategory((current) => current === icon ? null : icon)} aria-pressed={selectedCategory === icon}>
+          return <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => { setSelectedCategory((current) => current === icon ? null : icon); setVisibleCount(9); }} aria-pressed={selectedCategory === icon}>
             <span className="category-icon"><Icon name={icon}/></span><span>{names[lang]}</span><b><em>{count}</em>›</b>
           </button>;
         })}</div>
@@ -822,9 +863,9 @@ export default function Home() {
       <div className="product-grid">{shownProducts.map((product) => {
         const isAdded = Boolean(quoteItems[product.kind]);
         return <article className={`product-card ${isAdded ? "in-quote" : ""}`} key={product.kind}>
-          <div className="product-image"><span className="product-badge">{market === "kg" ? "KG" : "UZ"} {s.badge}</span><Image src={`${BASE_PATH}${product.image}`} alt={productLabel(product)} fill sizes="(max-width: 760px) 50vw, (max-width: 1050px) 50vw, 33vw"/></div>
+          <Link className="product-image" href={`/products/${product.kind}`} aria-label={`${detailLabel}: ${productLabel(product)}`}><span className="product-badge">{market === "kg" ? "KG" : "UZ"} {s.badge}</span><Image src={`${BASE_PATH}${product.image}`} alt={productLabel(product)} fill loading="lazy" sizes="(max-width: 760px) 50vw, (max-width: 1050px) 50vw, 33vw"/></Link>
           <div className="product-info">
-            <h3>{productLabel(product)}</h3>
+            <h3><Link href={`/products/${product.kind}`}>{productLabel(product)}</Link></h3>
             <div className="product-pricing">
               <div className="price-block purchase"><span>{t.chinaPrice}</span><strong>{formatCurrency(priceNumber(product.cost), currency)}</strong></div>
               <div className="price-block retail"><span>{t.localPrice}</span><strong>{formatCurrency(retailInCny(product), currency)}</strong></div>
@@ -832,13 +873,14 @@ export default function Home() {
             <div className="product-meta"><span>{t.moq} {product.moq} {t.pieces}</span><span>{product.orders} {t.orders}</span></div>
             <div className="product-footer">
               <span><i/>{t.rail} → {market === "kg" ? s.kgCity : s.uzCity}</span>
-              <button className={isAdded ? "added" : ""} onClick={() => addToQuote(product)} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button>
+              <div><Link href={`/products/${product.kind}`}>{detailLabel}</Link><button className={isAdded ? "added" : ""} onClick={(event) => addToQuote(product, event.currentTarget.closest(".product-card"))} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button></div>
             </div>
           </div>
         </article>;
       })}
         {shownProducts.length === 0 && <div className="empty-state">{s.empty}</div>}</div>
       </div>
+      {filteredProducts.length > 0 && <div className="catalog-pagination" aria-live="polite"><span>{showingLabel} {shownProducts.length} / {filteredProducts.length}</span>{shownProducts.length < filteredProducts.length && <button onClick={() => setVisibleCount((count) => count + 9)}>{loadMoreLabel}<b>+{Math.min(9, filteredProducts.length - shownProducts.length)}</b></button>}</div>}
     </section>
 
     <section className="process-section" id="process">
@@ -890,7 +932,7 @@ export default function Home() {
     </section>
     </>}
 
-    {quoteCount > 0 && <button className={`quote-tab ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen((open) => !open)} aria-label={`${iq.list}: ${quoteCount}`}>
+    {quoteCount > 0 && <button className={`quote-tab ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen((open) => !open)} aria-label={`${iq.list}: ${quoteCount}`} title={`${iq.list}: ${quoteCount}`}>
       <Icon name="cart"/><span>{iq.list}</span><b>{quoteCount}</b>
     </button>}
 
@@ -932,6 +974,6 @@ export default function Home() {
       </>}
     </aside>
 
-    <footer><Logo variant={logoVariant} lang={lang}/><p>{s.footerTagline}</p><span>{s.copyright}</span></footer>
+    <footer><Logo variant={logoVariant} lang={lang}/><p>{s.footerTagline}</p><nav aria-label="Legal"><Link href="/company">{lang === "zh" ? "公司信息" : "О компании"}</Link><Link href="/privacy">{lang === "zh" ? "隐私政策" : "Конфиденциальность"}</Link></nav><span>{s.copyright}</span></footer>
   </main>;
 }
