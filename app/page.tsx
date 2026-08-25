@@ -133,6 +133,29 @@ const siteCopy = {
   },
 } as const;
 
+const heroComparisonCopy = {
+  ru: {
+    label: "Сравнение цен сегодня", source: "Закупка в Китае", local: "Розница", gap: "Разница в цене",
+    disclaimer: "Без доставки и других расходов. Итоговая цена — после расчёта.", verified: "Цена поставщика проверена", reference: "Рыночная цена — ориентир",
+    show: "Показать товар", carousel: "Сравнение цен на популярные товары",
+  },
+  ky: {
+    label: "Бүгүнкү бааларды салыштыруу", source: "Кытайдагы сатып алуу", local: "Жергиликтүү чекене баа", gap: "Баалардын айырмасы",
+    disclaimer: "Жеткирүү жана башка чыгымдар кирбейт. Акыркы баа эсептен кийин аныкталат.", verified: "Жеткирүүчүнүн баасы текшерилди", reference: "Базар баасы — маалымат үчүн",
+    show: "Өнүмдү көрсөтүү", carousel: "Популярдуу өнүмдөрдүн бааларын салыштыруу",
+  },
+  uz: {
+    label: "Bugungi narxlar taqqoslanishi", source: "Xitoydagi xarid", local: "Mahalliy chakana narx", gap: "Narxlar farqi",
+    disclaimer: "Yetkazish va boshqa xarajatlar kiritilmagan. Yakuniy narx hisob-kitobdan keyin aniqlanadi.", verified: "Yetkazib beruvchi narxi tekshirildi", reference: "Bozor narxi — ma’lumot uchun",
+    show: "Mahsulotni ko‘rsatish", carousel: "Ommabop mahsulotlar narxlarini taqqoslash",
+  },
+  zh: {
+    label: "今日价格对比", source: "中国进货参考价", local: "当地零售参考价", gap: "单件理论价差",
+    disclaimer: "未包含运输及其他费用，以最终报价为准。", verified: "中国供应商价格已核对", reference: "当地市场价格仅作参考",
+    show: "显示商品", carousel: "热销商品价格对比",
+  },
+} as const;
+
 const processCopy = {
   ru: {
     eyebrow: "КАК ЭТО РАБОТАЕТ", title: "От выбранного товара до доставки", subtitle: "Один менеджер сопровождает запрос от проверки фабрики до прибытия груза в ваш город.",
@@ -250,6 +273,8 @@ const products = [
   { name: productName("Магнитный светильник с датчиком движения", "Harakat sensorli magnit shkaf chirog‘i", "人体感应磁吸柜灯"), image: "/products/29-motion-sensor-magnetic-cabinet-light.jpg", cost: "¥ 15.80", retail: { kg: "1 580 сом", uz: "218 000 so‘m" }, moq: 30, orders: 746, kind: "sensor-light" },
   { name: productName("PTC-сушилка для обуви", "PTC poyabzal quritgichi", "PTC恒温烘鞋器"), image: "/products/30-ptc-shoe-dryer.jpg", cost: "¥ 28.50", retail: { kg: "2 850 сом", uz: "395 000 so‘m" }, moq: 20, orders: 584, kind: "shoe-dryer" },
 ];
+
+const heroProductKinds = ["phone-case", "screen-protector", "bag-sealer"] as const;
 
 const productCategories: Record<string, CategoryId> = {
   "screen-protector": "digital", "phone-case": "digital", "usb-c-cable": "digital", "phone-stand": "digital",
@@ -392,11 +417,16 @@ export default function Home() {
   const [submitted, setSubmitted] = useState(false);
   const [showBrand, setShowBrand] = useState(false);
   const [logoVariant, setLogoVariant] = useState<LogoVariant>(1);
+  const [heroSlide, setHeroSlide] = useState(0);
+  const [heroPaused, setHeroPaused] = useState(false);
+  const [heroTouchStart, setHeroTouchStart] = useState<number | null>(null);
   const t = copy[lang];
   const iq = inquiryCopy[lang];
   const s = siteCopy[lang];
   const pc = processCopy[lang];
+  const hc = heroComparisonCopy[lang];
   const productLabel = (product: (typeof products)[number]) => lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang];
+  const heroProducts = useMemo(() => heroProductKinds.map((kind) => products.find((product) => product.kind === kind)).filter((product): product is (typeof products)[number] => Boolean(product)), []);
   const shownProducts = useMemo(() => products.filter((product) => {
     const matchesCategory = !selectedCategory || productCategories[product.kind] === selectedCategory;
     const matchesQuery = !query || (lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang]).toLowerCase().includes(query.toLowerCase());
@@ -417,11 +447,26 @@ export default function Home() {
     return () => { document.body.style.overflow = ""; };
   }, [drawerOpen]);
 
+  useEffect(() => {
+    if (heroPaused || drawerOpen || showBrand || heroProducts.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const interval = window.setInterval(() => setHeroSlide((current) => (current + 1) % heroProducts.length), 5000);
+    return () => window.clearInterval(interval);
+  }, [drawerOpen, heroPaused, heroProducts.length, showBrand]);
+
   const retailInCny = (product: (typeof products)[number]) => {
     const sourceCurrency: Currency = market === "kg" ? "KGS" : "UZS";
     const sourceRate = currencyOptions.find((item) => item.code === sourceCurrency)?.perCny ?? 1;
     return priceNumber(product.retail[market]) / sourceRate;
   };
+
+  const changeHeroSlide = (direction: number) => {
+    setHeroSlide((current) => (current + direction + heroProducts.length) % heroProducts.length);
+  };
+
+  const heroProduct = heroProducts[heroSlide % heroProducts.length];
+  const heroRetailCny = heroProduct ? retailInCny(heroProduct) : 0;
+  const heroCostCny = heroProduct ? priceNumber(heroProduct.cost) : 0;
+  const heroGapCny = Math.max(0, heroRetailCny - heroCostCny);
 
   const addToQuote = (product: (typeof products)[number]) => {
     if (quoteItems[product.kind]) {
@@ -472,9 +517,41 @@ export default function Home() {
         <div className="hero-copy"><span className="eyebrow"><i/>{t.eyebrow}</span><h1>{t.title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1><p>{t.subtitle}</p>
           <div className="hero-actions"><a className="primary-cta" href="#products">{t.cta}<Icon name="arrow"/></a><button className="secondary-cta" onClick={() => setNotice(s.logisticsNotice)}>{t.logistics}</button></div>
         </div>
-        <div className="route-visual" aria-label={t.route}><div className="sun-disc"/><div className="route-card"><span>{t.route}</span><strong>{t.days}</strong><small>{t.arrival}</small></div>
-          <svg viewBox="0 0 430 260" aria-hidden="true"><path className="land" d="M28 197c48-62 92-67 139-30 45-75 101-91 159-35 24-22 51-23 77-4v97H28Z"/><path className="rail" d="M32 214C139 189 237 189 405 151"/><path className="rail rail-two" d="M34 225c111-25 212-26 373-62"/><path className="track" d="m74 205 7 11m44-23 7 11m48-22 7 11m49-21 7 11m49-24 7 11m48-23 7 11"/><g className="train"><path d="M265 129h69l18 20-5 20-77 16-13-16Z"/><path d="M277 139h18v13h-22M302 139h23l11 13h-34Z"/><circle cx="280" cy="176" r="7"/><circle cx="330" cy="166" r="7"/></g></svg>
-          <div className="route-cities"><span className="china">{s.china}</span><span className="kg">KG</span><span className="uz">UZ</span></div>
+        <div className="hero-price-shell">
+          {heroProduct && <section
+            className="hero-price-carousel"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label={hc.carousel}
+            onMouseEnter={() => setHeroPaused(true)}
+            onMouseLeave={() => setHeroPaused(false)}
+            onFocusCapture={() => setHeroPaused(true)}
+            onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setHeroPaused(false); }}
+            onTouchStart={(event) => setHeroTouchStart(event.touches[0]?.clientX ?? null)}
+            onTouchEnd={(event) => {
+              const end = event.changedTouches[0]?.clientX;
+              if (heroTouchStart !== null && end !== undefined && Math.abs(end - heroTouchStart) > 40) changeHeroSlide(end > heroTouchStart ? -1 : 1);
+              setHeroTouchStart(null);
+            }}
+          >
+            <div className="hero-price-slide" key={`${heroProduct.kind}-${market}-${currency}-${lang}`} aria-live="polite">
+              <header className="hero-price-head">
+                <img src={`${BASE_PATH}${heroProduct.image}`} alt={productLabel(heroProduct)}/>
+                <div><strong>{productLabel(heroProduct)}</strong><span>{hc.label} · {t.moq} {heroProduct.moq} {t.pieces}</span></div>
+                <small>{market === "kg" ? s.kgCity : s.uzCity}</small>
+              </header>
+              <div className="hero-price-compare">
+                <div className="hero-price-value"><span>{hc.source}</span><strong>{formatCurrency(heroCostCny, currency)}</strong><small>{hc.verified}</small></div>
+                <i aria-hidden="true">→</i>
+                <div className="hero-price-value local"><span>{hc.local}</span><strong>{formatCurrency(heroRetailCny, currency)}</strong><small>{hc.reference}</small></div>
+              </div>
+              <div className="hero-price-result">
+                <div><span>{hc.gap}</span><strong>+{formatCurrency(heroGapCny, currency)}</strong><small>{hc.disclaimer}</small></div>
+                <b aria-hidden="true">{String(heroSlide + 1).padStart(2, "0")} / {String(heroProducts.length).padStart(2, "0")}</b>
+              </div>
+            </div>
+            <div className="hero-carousel-dots">{heroProducts.map((product, index) => <button key={product.kind} className={index === heroSlide ? "active" : ""} onClick={() => setHeroSlide(index)} aria-label={`${hc.show} ${index + 1}`} aria-current={index === heroSlide ? "true" : undefined}/>)}</div>
+          </section>}
         </div>
       </div>
     </section>
