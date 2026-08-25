@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { BASE_PATH } from "./base-path";
 
@@ -531,16 +532,6 @@ function Icon({ name }: { name: string }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}>{paths[name]}</svg>;
 }
 
-function ProductVisual({ kind }: { kind: string }) {
-  const common = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  return <svg viewBox="0 0 180 150" aria-hidden="true" {...common}>
-    {kind === "kettle" && <><path d="M61 54h57l6 60H55l6-60Z"/><path d="M70 54V40h38v14M118 64c24-5 30 12 20 27-4 6-10 9-16 10M77 40c-10-24 32-24 25 0"/><path d="M68 91h42"/></>}
-    {kind === "box" && <><path d="M42 55h96v67H42z"/><path d="m42 55 14-20h68l14 20M56 35l18 20M124 35l-18 20M78 82h24M90 55v67"/></>}
-    {kind === "drill" && <><path d="M45 56h81l12 12-12 18H93v-9H45V56Z"/><path d="M92 86v36H68l-9-45M126 64h17M143 59v10M106 69h12"/><circle cx="78" cy="97" r="5"/></>}
-    {kind === "coat" && <><path d="m70 34 20 12 20-12 27 20-16 25-11-7v52H70V72l-11 7-16-25 27-20Z"/><path d="M90 46v78M72 34c2 16 34 16 36 0M70 87h20M110 87H90"/></>}
-  </svg>;
-}
-
 function BrandGuide({ onClose, selected, onSelect }: { onClose: () => void; selected: LogoVariant; onSelect: (variant: LogoVariant) => void }) {
   const current = logoOptions.find((item) => item.id === selected) ?? logoOptions[0];
   const colors = [
@@ -750,7 +741,7 @@ export default function Home() {
         </div>
         {activeNews && <article className="news-detail" id="news-detail" aria-label={`${nc.detail}: ${activeNews.title[lang]}`}>
           <div className="news-detail-photo">
-            <img src={`${BASE_PATH}${activeNews.image}`} alt={activeNews.photoCaption[lang]}/>
+            <Image src={`${BASE_PATH}${activeNews.image}`} alt={activeNews.photoCaption[lang]} fill sizes="(max-width: 760px) 100vw, 420px"/>
             <span>{activeNews.tag[lang]}</span>
             <button onClick={() => setActiveNewsId(null)} aria-label={nc.close}>×</button>
           </div>
@@ -788,7 +779,7 @@ export default function Home() {
           >
             <div className="hero-price-slide" key={`${heroProduct.kind}-${market}-${currency}-${lang}`} aria-live="polite">
               <header className="hero-price-head">
-                <img src={`${BASE_PATH}${heroProduct.image}`} alt={productLabel(heroProduct)}/>
+                <Image src={`${BASE_PATH}${heroProduct.image}`} alt={productLabel(heroProduct)} width={52} height={52} sizes="52px"/>
                 <div><strong>{productLabel(heroProduct)}</strong><span>{hc.label} · {t.moq} {heroProduct.moq} {t.pieces}</span></div>
                 <small>{market === "kg" ? s.kgCity : s.uzCity}</small>
               </header>
@@ -831,7 +822,7 @@ export default function Home() {
       <div className="product-grid">{shownProducts.map((product) => {
         const isAdded = Boolean(quoteItems[product.kind]);
         return <article className={`product-card ${isAdded ? "in-quote" : ""}`} key={product.kind}>
-          <div className="product-image"><span className="product-badge">{market === "kg" ? "KG" : "UZ"} {s.badge}</span><img src={`${BASE_PATH}${product.image}`} alt={productLabel(product)}/></div>
+          <div className="product-image"><span className="product-badge">{market === "kg" ? "KG" : "UZ"} {s.badge}</span><Image src={`${BASE_PATH}${product.image}`} alt={productLabel(product)} fill sizes="(max-width: 760px) 50vw, (max-width: 1050px) 50vw, 33vw"/></div>
           <div className="product-info">
             <h3>{productLabel(product)}</h3>
             <div className="product-pricing">
@@ -875,7 +866,7 @@ export default function Home() {
         onFocus={() => setTrustPaused(true)}
         onBlur={() => setTrustPaused(false)}
       >
-        <img key={`${lang}-${trustSlide}`} className="trust-story-image" src={`${BASE_PATH}${trustStoryImages[trustSlide]}`} alt={tc.slides[trustSlide][0]}/>
+        <Image key={`${lang}-${trustSlide}`} className="trust-story-image" src={`${BASE_PATH}${trustStoryImages[trustSlide]}`} alt={tc.slides[trustSlide][0]} fill sizes="100vw"/>
         <div className="trust-story-shade"/>
         <article className="trust-story-copy" key={`copy-${lang}-${trustSlide}`}>
           <span className="trust-story-eyebrow"><i/>{tc.eyebrow}</span>
@@ -913,7 +904,7 @@ export default function Home() {
       {quoteCount === 0 ? <div className="drawer-empty"><Icon name="cart"/><p>{iq.empty}</p><button onClick={() => { setDrawerOpen(false); document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" }); }}>{t.cta}</button></div> : <>
         <div className="inquiry-products">
           {selectedProducts.map((product) => <article key={product.kind}>
-            <img src={`${BASE_PATH}${product.image}`} alt=""/>
+            <Image src={`${BASE_PATH}${product.image}`} alt="" width={58} height={58} sizes="58px"/>
             <div className="inquiry-product-copy">
               <h3>{productLabel(product)}</h3>
               <span>{formatCurrency(priceNumber(product.cost), currency)} / {t.pieces}</span>
