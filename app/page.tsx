@@ -156,6 +156,154 @@ const heroComparisonCopy = {
   },
 } as const;
 
+const newsCopy = {
+  ru: {
+    eyebrow: "ТРАНСПОРТНАЯ СВОДКА", title: "Железная дорога и логистика", verified: "Только официальные источники",
+    source: "Первоисточник", photo: "Документальное фото", open: "Открыть материал", close: "Закрыть материал", detail: "Подробности",
+  },
+  ky: {
+    eyebrow: "ТРАНСПОРТ КАБАРЛАРЫ", title: "Темир жол жана логистика", verified: "Расмий булактар гана",
+    source: "Баштапкы булак", photo: "Чыныгы сүрөт", open: "Материалды ачуу", close: "Материалды жабуу", detail: "Толук маалымат",
+  },
+  uz: {
+    eyebrow: "TRANSPORT DAYJESTI", title: "Temir yo‘l va logistika", verified: "Faqat rasmiy manbalar",
+    source: "Asl manba", photo: "Haqiqiy surat", open: "Maqolani ochish", close: "Maqolani yopish", detail: "Batafsil",
+  },
+  zh: {
+    eyebrow: "运输简报", title: "铁路与物流动态", verified: "仅采用官方信息源",
+    source: "原始来源", photo: "真实资料图", open: "查看官方原文", close: "关闭详情", detail: "详细信息",
+  },
+} as const;
+
+const logisticsNews = [
+  {
+    id: "border-logistics", date: "2026-07-30", image: "/news/torugart-crossing.jpg",
+    sourceUrl: "https://gov.uz/ru/minenergy/news/view/200002",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:Torugartcrossing.jpg",
+    tag: { ru: "ГРАНИЦА", ky: "ЧЕК АРА", uz: "CHEGARA", zh: "口岸" },
+    title: {
+      ru: "Узбекистан и Кыргызстан усилят инфраструктуру вдоль железной дороги",
+      ky: "Өзбекстан менен Кыргызстан темир жол боюндагы инфраструктураны күчөтөт",
+      uz: "O‘zbekiston va Qirg‘iziston temir yo‘l bo‘yi infratuzilmasini rivojlantiradi",
+      zh: "乌吉将推进铁路沿线口岸与商贸物流设施",
+    },
+    summary: {
+      ru: "Стороны договорились развивать пограничную и торгово-логистическую инфраструктуру, цифровизировать разрешительные процедуры и улучшать условия для автоперевозчиков.",
+      ky: "Тараптар чек ара жана соода-логистикалык инфраструктураны өнүктүрүү, уруксат берүү жол-жоболорун санариптештирүү жана автоташуучулар үчүн шарттарды жакшыртуу боюнча макулдашты.",
+      uz: "Tomonlar chegara va savdo-logistika infratuzilmasini rivojlantirish, ruxsat berish jarayonlarini raqamlashtirish va avtomobil tashuvchilari uchun sharoitlarni yaxshilashga kelishdi.",
+      zh: "双方同意发展铁路沿线口岸和商贸物流基础设施，推动许可手续数字化，并改善公路承运人的通行条件。",
+    },
+    sourceName: { ru: "Правительственный портал Узбекистана", ky: "Өзбекстан Өкмөтүнүн порталы", uz: "O‘zbekiston Hukumat portali", zh: "乌兹别克斯坦政府门户网站" },
+    photoCaption: { ru: "Погранпереход Торугарт, Кыргызстан — Китай", ky: "Торугарт чек ара өткөрмө пункту, Кыргызстан — Кытай", uz: "Torugart chegara o‘tish punkti, Qirg‘iziston — Xitoy", zh: "吐尔尕特中吉边境口岸实景" },
+    photoCredit: { ru: "Alexdejoyeuse · общественное достояние / Wikimedia Commons", ky: "Alexdejoyeuse · коомдук домен / Wikimedia Commons", uz: "Alexdejoyeuse · jamoat mulki / Wikimedia Commons", zh: "Alexdejoyeuse · 公有领域 / Wikimedia Commons" },
+  },
+  {
+    id: "railway-schedule", date: "2026-07-15", image: "/news/balykchy-aerial.jpg",
+    sourceUrl: "https://gov.uz/ru/mintrans/news/view/193833",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:%D0%91%D0%B0%D0%BB%D1%8B%D0%BA%D1%87%D1%8B,_%D1%81%D1%82%D0%B0%D0%BD%D1%86%D0%B8%D1%8F_%D1%81%D0%B2%D0%B5%D1%80%D1%85%D1%83_(1).jpg",
+    tag: { ru: "СТРОЙКА", ky: "КУРУЛУШ", uz: "QURILISH", zh: "建设" },
+    title: {
+      ru: "Работы на железной дороге Китай — Кыргызстан — Узбекистан идут по графику",
+      ky: "Кытай — Кыргызстан — Өзбекстан темир жолунун курулушу график боюнча жүрүүдө",
+      uz: "Xitoy — Qirg‘iziston — O‘zbekiston temir yo‘li ishlari jadval bo‘yicha ketmoqda",
+      zh: "中吉乌铁路建设按既定计划推进",
+    },
+    summary: {
+      ru: "На встрече транспортных ведомств подтверждено соблюдение графика. Также обсуждались мультимодальный коридор и возможность экспортного статуса для пограничной станции Кашгар.",
+      ky: "Транспорт мекемелеринин жолугушуусунда курулуш графиги сакталганы белгиленди. Көп түрдүү ташуу коридору жана Кашгар чек ара станциясына экспорттук макам берүү да талкууланды.",
+      uz: "Transport idoralari uchrashuvida qurilish jadvaliga rioya qilinayotgani qayd etildi. Multimodal yo‘lak va Qashg‘ar chegara stansiyasiga eksport maqomi berish masalasi ham muhokama qilindi.",
+      zh: "交通部门会谈确认工程按计划推进，同时讨论提升中吉乌多式联运通道吸引力，以及研究赋予喀什边境站“出口站”地位。",
+    },
+    sourceName: { ru: "Министерство транспорта Узбекистана", ky: "Өзбекстандын Транспорт министрлиги", uz: "O‘zbekiston Transport vazirligi", zh: "乌兹别克斯坦交通部" },
+    photoCaption: { ru: "Железнодорожная станция Балыкчы, Кыргызстан", ky: "Балыкчы темир жол станциясы, Кыргызстан", uz: "Baliqchi temir yo‘l stansiyasi, Qirg‘iziston", zh: "吉尔吉斯斯坦巴雷克奇铁路站实景" },
+    photoCredit: { ru: "Nikolai Bulykin · лицензия CC BY-SA 4.0 / Wikimedia Commons", ky: "Nikolai Bulykin · CC BY-SA 4.0 лицензиясы / Wikimedia Commons", uz: "Nikolai Bulykin · CC BY-SA 4.0 litsenziyasi / Wikimedia Commons", zh: "Nikolai Bulykin · CC BY-SA 4.0 授权 / Wikimedia Commons" },
+  },
+  {
+    id: "south-transit", date: "2026-07-07", image: "/news/uzbekistan-freight-train.jpg",
+    sourceUrl: "https://gov.uz/ru/mintrans/news/view/189129",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:OTY_2O%27Z_UY_Tangimush_-_Pulhokim.jpg",
+    tag: { ru: "ГРУЗЫ", ky: "ЖҮК", uz: "YUK", zh: "货运" },
+    title: {
+      ru: "Южный транзит через Узбекистан вырос на 23%",
+      ky: "Өзбекстан аркылуу түштүк транзити 23% өстү",
+      uz: "O‘zbekiston orqali janubiy tranzit 23 foizga oshdi",
+      zh: "乌兹别克斯坦南向过境货运增长 23%",
+    },
+    summary: {
+      ru: "В первом квартале 2026 года южный транзит достиг 1,8 млн тонн: 1,3 млн тонн перевезено по железной дороге и 0,5 млн тонн автотранспортом.",
+      ky: "2026-жылдын биринчи чейрегинде түштүк багытындагы транзит 1,8 млн тоннага жетти: 1,3 млн тоннасы темир жол, 0,5 млн тоннасы автоунаа менен ташылды.",
+      uz: "2026-yil birinchi choragida janubiy tranzit 1,8 mln tonnaga yetdi: 1,3 mln tonna temir yo‘l, 0,5 mln tonna avtomobil transporti hissasiga to‘g‘ri keldi.",
+      zh: "2026 年第一季度南向过境货运达到 180 万吨，其中铁路 130 万吨、公路 50 万吨。",
+    },
+    sourceName: { ru: "Министерство транспорта Узбекистана", ky: "Өзбекстандын Транспорт министрлиги", uz: "O‘zbekiston Transport vazirligi", zh: "乌兹别克斯坦交通部" },
+    photoCaption: { ru: "Грузовой поезд между Тангимушем и Пулхокимом, Узбекистан", ky: "Өзбекстандагы Тангимуш — Пулхоким жүк поезди", uz: "Tangimush va Pulhokim oralig‘idagi yuk poyezdi, O‘zbekiston", zh: "乌兹别克斯坦唐吉穆什—普尔霍基姆区间货运列车" },
+    photoCredit: { ru: "Kabelleger · лицензия CC BY-SA 4.0 / Wikimedia Commons", ky: "Kabelleger · CC BY-SA 4.0 лицензиясы / Wikimedia Commons", uz: "Kabelleger · CC BY-SA 4.0 litsenziyasi / Wikimedia Commons", zh: "Kabelleger · CC BY-SA 4.0 授权 / Wikimedia Commons" },
+  },
+  {
+    id: "e-logistics", date: "2026-06-24", image: "/news/kant-station.jpg",
+    sourceUrl: "https://gov.uz/en/imv/news/view/183443",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:Kant_near_Bishkek_03-2016_img03_railway_station.jpg",
+    tag: { ru: "ЦИФРОВОЕ", ky: "САНАРИП", uz: "RAQAMLI", zh: "数字化" },
+    title: {
+      ru: "Узбекистан готовит единую платформу E-Logistics",
+      ky: "Өзбекстан бирдиктүү E-Logistics платформасын даярдоодо",
+      uz: "O‘zbekiston yagona E-Logistics platformasini tayyorlamoqda",
+      zh: "乌兹别克斯坦推进统一 E‑Logistics 平台",
+    },
+    summary: {
+      ru: "Проект предусматривает электронные грузовые документы, автоматический обмен данными с таможней и транспортным контролем, а также сквозное отслеживание доставки.",
+      ky: "Долбоор жүк документтерин электрондук форматка өткөрүүнү, бажы жана транспорт көзөмөлү менен автоматтык маалымат алмашууну, ошондой эле жеткирүүнү толук көзөмөлдөөнү карайт.",
+      uz: "Loyiha yuk hujjatlarini elektronlashtirish, bojxona va transport nazorati bilan avtomatik ma’lumot almashish hamda yetkazib berishni boshidan oxirigacha kuzatishni nazarda tutadi.",
+      zh: "项目计划将货运文件电子化，与海关和运输监管机构自动交换数据，并对货物从起运到交付进行全流程跟踪。",
+    },
+    sourceName: { ru: "Портал Министерства экономики и финансов", ky: "Экономика жана финансы министрлигинин порталы", uz: "Iqtisodiyot va moliya vazirligi portali", zh: "乌兹别克斯坦经济财政部门门户网站" },
+    photoCaption: { ru: "Железнодорожная станция Кант, Кыргызстан", ky: "Кант темир жол станциясы, Кыргызстан", uz: "Kant temir yo‘l stansiyasi, Qirg‘iziston", zh: "吉尔吉斯斯坦坎特铁路站实景" },
+    photoCredit: { ru: "A.Savin, Wikipedia · свободная лицензия Art Libre / Wikimedia Commons", ky: "A.Savin, Wikipedia · Art Libre эркин лицензиясы / Wikimedia Commons", uz: "A.Savin, Wikipedia · Art Libre erkin litsenziyasi / Wikimedia Commons", zh: "A.Savin, Wikipedia · Art Libre 自由艺术许可 / Wikimedia Commons" },
+  },
+  {
+    id: "middle-corridor", date: "2026-05-15", image: "/news/torugart-road.jpg",
+    sourceUrl: "https://www.digital.gov.uz/en/mfa/news/view/166841",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:2015-09-09-092043_-_Zum_Torugart-Pass.jpg",
+    tag: { ru: "КОРИДОР", ky: "КОРИДОР", uz: "YO‘LAK", zh: "通道" },
+    title: {
+      ru: "Средний коридор планируют связать с новой железной дорогой",
+      ky: "Орто коридорду жаңы темир жол менен байланыштыруу пландалууда",
+      uz: "O‘rta yo‘lakni yangi temir yo‘l bilan bog‘lash rejalashtirilmoqda",
+      zh: "中间走廊拟与中吉乌铁路衔接",
+    },
+    summary: {
+      ru: "На саммите тюркских государств обозначены задачи по соединению Среднего коридора со строящейся железной дорогой и полной цифровизации обмена таможенными данными.",
+      ky: "Түрк мамлекеттеринин саммитинде Орто коридорду курулуп жаткан темир жолго туташтыруу жана бажы маалыматтарын толук санарип алмашуу милдеттери белгиленди.",
+      uz: "Turkiy davlatlar sammitida O‘rta yo‘lakni qurilayotgan temir yo‘lga ulash va bojxona ma’lumotlari almashinuvini to‘liq raqamlashtirish vazifalari belgilandi.",
+      zh: "突厥国家组织峰会提出，将中间走廊与在建中吉乌铁路衔接，并推动海关数据交换全面数字化。",
+    },
+    sourceName: { ru: "Правительственный портал Узбекистана", ky: "Өзбекстан Өкмөтүнүн порталы", uz: "O‘zbekiston Hukumat portali", zh: "乌兹别克斯坦政府门户网站" },
+    photoCaption: { ru: "Автодорога к перевалу Торугарт, Кыргызстан", ky: "Торугарт ашуусуна кеткен жол, Кыргызстан", uz: "Torugart dovoniga olib boruvchi yo‘l, Qirg‘iziston", zh: "吉尔吉斯斯坦通往吐尔尕特山口的公路实景" },
+    photoCredit: { ru: "Zossolino · лицензия CC BY-SA 4.0 / Wikimedia Commons", ky: "Zossolino · CC BY-SA 4.0 лицензиясы / Wikimedia Commons", uz: "Zossolino · CC BY-SA 4.0 litsenziyasi / Wikimedia Commons", zh: "Zossolino · CC BY-SA 4.0 授权 / Wikimedia Commons" },
+  },
+  {
+    id: "freight-cars", date: "2026-02-26", image: "/news/balykchy-station.jpg",
+    sourceUrl: "https://gov.uz/en/news/view/136854",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:Balykchy_railway_station.jpg",
+    tag: { ru: "ВАГОНЫ", ky: "ВАГОН", uz: "VAGON", zh: "运力" },
+    title: {
+      ru: "Узбекистан расширяет парк грузовых вагонов",
+      ky: "Өзбекстан жүк вагондорунун паркын кеңейтүүдө",
+      uz: "O‘zbekiston yuk vagonlari parkini kengaytirmoqda",
+      zh: "乌兹别克斯坦扩大铁路货车运力",
+    },
+    summary: {
+      ru: "На 2026 год поставлена задача довести выпуск до 2 000 грузовых вагонов. Дополнительное финансирование должно обеспечить поставку ещё 1 350 вагонов.",
+      ky: "2026-жылы жүк вагондорун чыгарууну 2 000 даанага жеткирүү милдети коюлду. Кошумча каржылоо дагы 1 350 вагон жеткирүүгө багытталат.",
+      uz: "2026-yilda yuk vagonlari ishlab chiqarishni 2 000 donaga yetkazish vazifasi qo‘yildi. Qo‘shimcha moliyalashtirish yana 1 350 vagon yetkazib berishni ta’minlaydi.",
+      zh: "2026 年铁路货车产能目标提高至 2,000 辆，新增资金将用于保障再供应 1,350 辆货车。",
+    },
+    sourceName: { ru: "Правительственный портал Узбекистана", ky: "Өзбекстан Өкмөтүнүн порталы", uz: "O‘zbekiston Hukumat portali", zh: "乌兹别克斯坦政府门户网站" },
+    photoCaption: { ru: "Железнодорожная станция Балыкчы, Кыргызстан", ky: "Балыкчы темир жол станциясы, Кыргызстан", uz: "Baliqchi temir yo‘l stansiyasi, Qirg‘iziston", zh: "吉尔吉斯斯坦巴雷克奇铁路站实景" },
+    photoCredit: { ru: "Robert-Antonio · лицензия CC BY-SA 3.0 / Wikimedia Commons", ky: "Robert-Antonio · CC BY-SA 3.0 лицензиясы / Wikimedia Commons", uz: "Robert-Antonio · CC BY-SA 3.0 litsenziyasi / Wikimedia Commons", zh: "Robert-Antonio · CC BY-SA 3.0 授权 / Wikimedia Commons" },
+  },
+] as const;
+
 const processCopy = {
   ru: {
     eyebrow: "КАК ЭТО РАБОТАЕТ", title: "От выбранного товара до доставки", subtitle: "Один менеджер сопровождает запрос от проверки фабрики до прибытия груза в ваш город.",
@@ -198,6 +346,57 @@ const processCopy = {
     choose: "选择商品", quote: "获取采购报价", facts: ["供应商文件核验", "付款前确认费用", "铁路运输约 12–18 天"],
   },
 } as const;
+
+const trustStoryCopy = {
+  ru: {
+    eyebrow: "ПРОЗРАЧНЫЙ ПУТЬ ПОСТАВКИ", title: "От первого разговора до двери магазина", photo: "Реальная деловая сцена", stage: "Этап",
+    slides: [
+      ["Переговоры и закупка", "Менеджер уточняет модель, количество, цену и условия поставки по телефону или WhatsApp."],
+      ["Профессиональный подбор", "Специалисты проверяют товар на месте и подбирают позиции с учётом спроса вашего рынка."],
+      ["Железнодорожная доставка", "После упаковки груз отправляется по железной дороге в Кыргызстан или Узбекистан."],
+      ["Отправка с местного склада", "По прибытии груз принимается на местном складе, сверяется и готовится к последней доставке."],
+      ["Получение у двери", "Согласованный груз доставляется по адресу — предприниматель принимает и проверяет товар."],
+    ],
+  },
+  ky: {
+    eyebrow: "ЖЕТКИРҮҮНҮН АЧЫК ЖОЛУ", title: "Биринчи сүйлөшүүдөн дүкөндүн эшигине чейин", photo: "Чыныгы ишкердик көрүнүш", stage: "Этап",
+    slides: [
+      ["Сүйлөшүү жана сатып алуу", "Менеджер телефон же WhatsApp аркылуу модель, сан, баа жана жеткирүү шарттарын тактайт."],
+      ["Адистердин тандоосу", "Адистер товарды жеринде текшерип, сиздин базардын суроо-талабына ылайык позицияларды тандашат."],
+      ["Темир жол менен жеткирүү", "Таңгакталгандан кийин жүк Кыргызстанга же Өзбекстанга темир жол аркылуу жөнөтүлөт."],
+      ["Жергиликтүү кампадан жөнөтүү", "Жүк келгенде жергиликтүү кампада кабыл алынып, текшерилип, акыркы жеткирүүгө даярдалат."],
+      ["Эшиктен кабыл алуу", "Макулдашылган жүк көрсөтүлгөн дарекке жеткирилип, ишкер товарды кабыл алып текшерет."],
+    ],
+  },
+  uz: {
+    eyebrow: "SHAFFOF YETKAZIB BERISH YO‘LI", title: "Birinchi suhbatdan do‘kon eshigigacha", photo: "Haqiqiy biznes jarayoni", stage: "Bosqich",
+    slides: [
+      ["Muzokara va xarid", "Menejer telefon yoki WhatsApp orqali model, miqdor, narx va yetkazish shartlarini aniqlaydi."],
+      ["Mutaxassislar tanlovi", "Mutaxassislar mahsulotni joyida tekshiradi va bozoringiz talabiga mos pozitsiyalarni tanlaydi."],
+      ["Temir yo‘l orqali yetkazish", "Qadoqlangach, yuk Qirg‘iziston yoki O‘zbekistonga temir yo‘l orqali jo‘natiladi."],
+      ["Mahalliy ombordan jo‘natish", "Yuk kelgach, mahalliy omborda qabul qilinadi, tekshiriladi va so‘nggi yetkazishga tayyorlanadi."],
+      ["Eshik oldida qabul qilish", "Kelishilgan yuk ko‘rsatilgan manzilga yetkaziladi, tadbirkor mahsulotni qabul qilib tekshiradi."],
+    ],
+  },
+  zh: {
+    eyebrow: "看得见的采购履约", title: "从第一次沟通，到商户门前收货", photo: "真实业务场景图", stage: "采购阶段",
+    slides: [
+      ["沟通谈判，确认采购合作", "采购经理通过电话或 WhatsApp 确认商品型号、数量、价格与交付条件。"],
+      ["专业人员，实地选品", "专业人员在当地实地查看商品，并结合目标市场需求筛选更合适的货品。"],
+      ["铁路物流，跨境送货", "完成核验与装箱后，货物通过铁路运往吉尔吉斯斯坦或乌兹别克斯坦。"],
+      ["抵达当地，仓库发货", "货物到达当地仓库后完成入库核对，并按商户订单安排最后一段配送。"],
+      ["送到门前，商户收货", "货物送至约定地址，商户可在门前完成接收并核对商品。"],
+    ],
+  },
+} as const;
+
+const trustStoryImages = [
+  "/trust/01-negotiation.jpg",
+  "/trust/02-sourcing.jpg",
+  "/trust/03-rail.jpg",
+  "/trust/04-warehouse.jpg",
+  "/trust/05-delivery.jpg",
+] as const;
 
 const kyrgyzProductNames: Record<string, string> = {
   "screen-protector": "Смартфон үчүн коргоочу айнек", "phone-case": "Тунук соккуга чыдамдуу кап", "usb-c-cable": "Өрүлгөн USB-C тез кубаттоо кабели",
@@ -420,11 +619,16 @@ export default function Home() {
   const [heroSlide, setHeroSlide] = useState(0);
   const [heroPaused, setHeroPaused] = useState(false);
   const [heroTouchStart, setHeroTouchStart] = useState<number | null>(null);
+  const [trustSlide, setTrustSlide] = useState(0);
+  const [trustPaused, setTrustPaused] = useState(false);
+  const [activeNewsId, setActiveNewsId] = useState<string | null>(null);
   const t = copy[lang];
   const iq = inquiryCopy[lang];
   const s = siteCopy[lang];
   const pc = processCopy[lang];
+  const tc = trustStoryCopy[lang];
   const hc = heroComparisonCopy[lang];
+  const nc = newsCopy[lang];
   const productLabel = (product: (typeof products)[number]) => lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang];
   const heroProducts = useMemo(() => heroProductKinds.map((kind) => products.find((product) => product.kind === kind)).filter((product): product is (typeof products)[number] => Boolean(product)), []);
   const shownProducts = useMemo(() => products.filter((product) => {
@@ -436,6 +640,7 @@ export default function Home() {
   const selectedProducts = products.filter((product) => quoteItems[product.kind]);
   const quoteCount = selectedProducts.length;
   const destinationOptions = deliveryCities[market][lang];
+  const activeNews = logisticsNews.find((item) => item.id === activeNewsId);
 
   useEffect(() => {
     document.documentElement.lang = lang === "zh" ? "zh-CN" : lang;
@@ -448,10 +653,22 @@ export default function Home() {
   }, [drawerOpen]);
 
   useEffect(() => {
-    if (heroPaused || drawerOpen || showBrand || heroProducts.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (heroPaused || drawerOpen || showBrand || activeNewsId || heroProducts.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const interval = window.setInterval(() => setHeroSlide((current) => (current + 1) % heroProducts.length), 5000);
     return () => window.clearInterval(interval);
-  }, [drawerOpen, heroPaused, heroProducts.length, showBrand]);
+  }, [activeNewsId, drawerOpen, heroPaused, heroProducts.length, showBrand]);
+
+  useEffect(() => {
+    if (trustPaused || drawerOpen || showBrand || activeNewsId || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const interval = window.setInterval(() => setTrustSlide((current) => (current + 1) % trustStoryImages.length), 5200);
+    return () => window.clearInterval(interval);
+  }, [activeNewsId, drawerOpen, showBrand, trustPaused]);
+
+  useEffect(() => {
+    const closeNews = (event: KeyboardEvent) => { if (event.key === "Escape") setActiveNewsId(null); };
+    window.addEventListener("keydown", closeNews);
+    return () => window.removeEventListener("keydown", closeNews);
+  }, []);
 
   const retailInCny = (product: (typeof products)[number]) => {
     const sourceCurrency: Currency = market === "kg" ? "KGS" : "UZS";
@@ -497,13 +714,13 @@ export default function Home() {
     setSubmitted(true);
   };
 
-  return <main className="market-shell">
+  return <main className={`market-shell currency-${currency.toLowerCase()}`}>
     <div className="top-strip"><span>{s.top[0]}</span><i/><span>{s.top[1]}</span><i/><span>{s.top[2]}</span><div className="strip-route"><b>{s.stops[0]}</b><span>{s.stops[1]}</span><span>{s.stops[2]}</span><span>{s.stops[3]}</span></div></div>
     <header className="site-header">
       <Logo variant={logoVariant} lang={lang}/>
       <nav aria-label={s.navLabel}>{t.nav.map((item, i) => <a href={i === 0 ? "#categories" : i === 2 ? "#route" : "#products"} key={item}>{item}</a>)}</nav>
       <div className="header-actions">
-        <label className="language-select"><span className="sr-only">{s.languageLabel}</span><select value={lang} onChange={(e) => { setLang(e.target.value as Lang); setNotice(""); }}>{(Object.keys(copy) as Lang[]).map((key) => <option key={key} value={key}>{copy[key].label}</option>)}</select></label>
+        <label className="language-select" data-code={lang === "zh" ? "中" : lang.toUpperCase()}><span className="sr-only">{s.languageLabel}</span><select value={lang} onChange={(e) => { setLang(e.target.value as Lang); setNotice(""); }}>{(Object.keys(copy) as Lang[]).map((key) => <option key={key} value={key}>{copy[key].label}</option>)}</select></label>
         <label className="currency-select"><span className="sr-only">{s.currencyLabel}</span><select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>{currencyOptions.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
         <button className="quote-button" onClick={() => setDrawerOpen(true)} aria-expanded={drawerOpen} aria-controls="inquiry-drawer"><Icon name="cart"/>{iq.list}<span>{quoteCount}</span></button>
       </div>
@@ -511,11 +728,46 @@ export default function Home() {
     {notice && <button className="toast" onClick={() => setNotice("")}>{notice}<b>×</b></button>}
     {showBrand ? <BrandGuide onClose={() => setShowBrand(false)} selected={logoVariant} onSelect={setLogoVariant}/> : <>
     <section className="workspace">
-      <div className="workspace-reserved" aria-hidden="true"/>
+      <aside className="news-rail" aria-label={nc.title} onMouseLeave={() => setActiveNewsId(null)}>
+        <header className="news-rail-heading"><span>{nc.eyebrow}</span><h2>{nc.title}</h2><small><i/>{nc.verified}</small></header>
+        <div className="news-list">
+          {logisticsNews.map((item) => {
+            const selected = item.id === activeNewsId;
+            return <button
+              className={`news-item ${selected ? "active" : ""}`}
+              key={item.id}
+              onMouseEnter={() => setActiveNewsId(item.id)}
+              onFocus={() => setActiveNewsId(item.id)}
+              onClick={() => setActiveNewsId(item.id)}
+              aria-expanded={selected}
+              aria-controls="news-detail"
+            >
+              <time dateTime={item.date}>{item.date.slice(5).replace("-", ".")}</time>
+              <span><em>{item.tag[lang]}</em><strong>{item.title[lang]}</strong></span>
+              <b aria-hidden="true">›</b>
+            </button>;
+          })}
+        </div>
+        {activeNews && <article className="news-detail" id="news-detail" aria-label={`${nc.detail}: ${activeNews.title[lang]}`}>
+          <div className="news-detail-photo">
+            <img src={`${BASE_PATH}${activeNews.image}`} alt={activeNews.photoCaption[lang]}/>
+            <span>{activeNews.tag[lang]}</span>
+            <button onClick={() => setActiveNewsId(null)} aria-label={nc.close}>×</button>
+          </div>
+          <div className="news-detail-body">
+            <div className="news-detail-meta"><time dateTime={activeNews.date}>{activeNews.date.replaceAll("-", ".")}</time><span>{nc.detail}</span></div>
+            <h3>{activeNews.title[lang]}</h3>
+            <p>{activeNews.summary[lang]}</p>
+            <div className="news-detail-source"><span><small>{nc.source}</small><b>{activeNews.sourceName[lang]}</b></span><a href={activeNews.sourceUrl} target="_blank" rel="noreferrer">{nc.open}<i>↗</i></a></div>
+            <a className="news-photo-credit" href={activeNews.photoUrl} target="_blank" rel="noreferrer"><small>{nc.photo} · {activeNews.photoCaption[lang]}</small><span>{activeNews.photoCredit[lang]}</span></a>
+          </div>
+        </article>}
+      </aside>
+      {activeNews && <button className="news-mobile-backdrop" onClick={() => setActiveNewsId(null)} aria-label={nc.close}/>}
 
       <div className="hero" id="route">
         <div className="hero-copy"><span className="eyebrow"><i/>{t.eyebrow}</span><h1>{t.title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1><p>{t.subtitle}</p>
-          <div className="hero-actions"><a className="primary-cta" href="#products">{t.cta}<Icon name="arrow"/></a><button className="secondary-cta" onClick={() => setNotice(s.logisticsNotice)}>{t.logistics}</button></div>
+          <div className="hero-actions"><a className="primary-cta" href="#products">{t.cta}<Icon name="arrow"/></a></div>
         </div>
         <div className="hero-price-shell">
           {heroProduct && <section
@@ -564,7 +816,7 @@ export default function Home() {
     </div>
 
     <section className="products-section" id="products">
-      <div className="section-title"><div><span>2026 · {s.trend}</span><h2>{activeCategory ? activeCategory[1][lang] : t.market}</h2><p>{t.marketSub}</p></div><button onClick={() => setSelectedCategory(null)}>{t.all}<Icon name="arrow"/></button></div>
+      <div className="section-title"><div><span>2026 · {s.trend}</span><h2>{activeCategory ? activeCategory[1][lang] : t.market}</h2><p>{t.marketSub}</p></div></div>
       <div className="catalog-layout">
       <aside className="category-panel" id="categories">
         <div className="panel-heading"><strong>{t.categories}</strong><button onClick={() => setSelectedCategory(null)} aria-label={t.all}>☰</button></div>
@@ -579,7 +831,7 @@ export default function Home() {
       <div className="product-grid">{shownProducts.map((product) => {
         const isAdded = Boolean(quoteItems[product.kind]);
         return <article className={`product-card ${isAdded ? "in-quote" : ""}`} key={product.kind}>
-          <div className="product-image"><span className="product-badge">{market === "kg" ? "KG" : "UZ"} {s.badge}</span><img src={`${BASE_PATH}${product.image}`} alt={productLabel(product)}/><button aria-label={s.save}>♡</button></div>
+          <div className="product-image"><span className="product-badge">{market === "kg" ? "KG" : "UZ"} {s.badge}</span><img src={`${BASE_PATH}${product.image}`} alt={productLabel(product)}/></div>
           <div className="product-info">
             <h3>{productLabel(product)}</h3>
             <div className="product-pricing">
@@ -609,6 +861,40 @@ export default function Home() {
       <div className="process-action">
         <div>{pc.facts.map((fact) => <span key={fact}><i/> {fact}</span>)}</div>
         <button onClick={() => quoteCount > 0 ? setDrawerOpen(true) : document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" })}>{quoteCount > 0 ? pc.quote : pc.choose}<Icon name="arrow"/></button>
+      </div>
+    </section>
+
+    <section className="trust-story-section" aria-label={tc.title}>
+      <div
+        className="trust-story"
+        data-stage={trustSlide}
+        role="region"
+        aria-roledescription="carousel"
+        onMouseEnter={() => setTrustPaused(true)}
+        onMouseLeave={() => setTrustPaused(false)}
+        onFocus={() => setTrustPaused(true)}
+        onBlur={() => setTrustPaused(false)}
+      >
+        <img key={`${lang}-${trustSlide}`} className="trust-story-image" src={`${BASE_PATH}${trustStoryImages[trustSlide]}`} alt={tc.slides[trustSlide][0]}/>
+        <div className="trust-story-shade"/>
+        <article className="trust-story-copy" key={`copy-${lang}-${trustSlide}`}>
+          <span className="trust-story-eyebrow"><i/>{tc.eyebrow}</span>
+          <small>{tc.stage} {String(trustSlide + 1).padStart(2, "0")} / {String(trustStoryImages.length).padStart(2, "0")}</small>
+          <h2>{tc.title}</h2>
+          <h3>{tc.slides[trustSlide][0]}</h3>
+          <p>{tc.slides[trustSlide][1]}</p>
+          <b><i/> {tc.photo}</b>
+        </article>
+        <div className="trust-story-nav" role="tablist" aria-label={tc.title}>
+          {tc.slides.map(([title], index) => <button
+            key={title}
+            type="button"
+            role="tab"
+            aria-selected={index === trustSlide}
+            className={index === trustSlide ? "active" : ""}
+            onClick={() => setTrustSlide(index)}
+          ><span>{String(index + 1).padStart(2, "0")}</span><strong>{title}</strong></button>)}
+        </div>
       </div>
     </section>
     </>}
