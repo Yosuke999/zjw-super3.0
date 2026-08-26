@@ -5,6 +5,7 @@ import { BASE_PATH } from "../../base-path";
 import { catalogProducts, getProduct, type Product } from "../../catalog";
 import { currencyRates, supportedCurrencies, type Currency } from "../../currency";
 import { kyrgyzProductNames } from "../../product-localization";
+import ProductInquiryActions from "../../components/ProductInquiryActions";
 
 type Lang = "ru" | "ky" | "uz" | "zh";
 type SearchValue = string | string[] | undefined;
@@ -165,8 +166,13 @@ export default async function ProductPage({ params, searchParams }: PageProps) {
         <h1>{name}</h1>
         <div className="detail-prices"><section><small>{copy.sourcePrice}</small><strong>{formatSelectedCurrency(numberFromPrice(product.cost), currency, lang)}</strong><span>{copy.unitNote}</span></section><section><small>{copy.retailPrice}</small><b>{copy.kgMarket} · {formatMarketCurrency(product.retail.kg, "KGS", lang)}</b><b>{copy.uzMarket} · {formatMarketCurrency(product.retail.uz, "UZS", lang)}</b></section></div>
         <dl><div><dt>{copy.moq}</dt><dd>{product.moq} {copy.pieces}</dd></div><div><dt>{copy.inquiries}</dt><dd>{product.orders.toLocaleString(localeByLanguage[lang])} {copy.inquiriesUnit}</dd></div><div><dt>{copy.destination}</dt><dd>{copy.cities}</dd></div><div><dt>{copy.transport}</dt><dd>{copy.transportValue}</dd></div></dl>
+        <ProductInquiryActions
+          lang={lang}
+          currency={currency}
+          product={{ kind: product.kind, name, image: product.image, moq: product.moq, costCny: numberFromPrice(product.cost) }}
+        />
         <div className="detail-notice"><b>{copy.noticeTitle}</b><p>{copy.notice}</p></div>
-        <a className="detail-cta" href={returnUrl}>{copy.cta}</a>
+        <a className="detail-list-link" href={returnUrl}>{copy.back}</a>
       </div>
     </article>
     <section className="detail-assurance">{copy.assurances.map(([title, description], index) => <article key={title}><b>{String(index + 1).padStart(2, "0")}</b><h2>{title}</h2><p>{description}</p></article>)}</section>

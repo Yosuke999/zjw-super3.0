@@ -7,6 +7,8 @@ import { BASE_PATH } from "./base-path";
 import { catalogProducts, type ProductBadge } from "./catalog";
 import { buildProductHref, currencyOptions, formatCurrency, formatExchangeRate, formatUnitCurrency, supportedCurrencies, type Currency } from "./currency";
 import { kyrgyzProductNames } from "./product-localization";
+import CustomerServiceDock from "./components/CustomerServiceDock";
+import { customerServiceCopy, type ContactMethod } from "./customer-service";
 
 type Lang = "ru" | "ky" | "uz" | "zh";
 type CategoryId = "home" | "fashion" | "tools" | "digital" | "auto" | "beauty";
@@ -694,6 +696,7 @@ export default function Home() {
   const tc = trustStoryCopy[lang];
   const hc = heroComparisonCopy[lang];
   const nc = newsCopy[lang];
+  const sc = customerServiceCopy[lang];
   const localeUi = localePanelCopy[lang];
   const detailLabel = { ru: "Подробнее", ky: "Толугураак", uz: "Batafsil", zh: "查看详情" }[lang];
   const loadMoreLabel = { ru: "Показать ещё", ky: "Дагы көрсөтүү", uz: "Yana ko‘rsatish", zh: "加载更多" }[lang];
@@ -829,6 +832,12 @@ export default function Home() {
     setSubmitted(true);
   };
 
+  const openCustomerService = (method: ContactMethod) => {
+    setPreferredContact(method);
+    setSubmitted(false);
+    setDrawerOpen(true);
+  };
+
   return <main className={`market-shell currency-${currency.toLowerCase()} lang-${lang}`}>
     <div className="top-strip"><span className="top-copy-mobile">{mobileTopCopy[lang]}</span><span className="top-copy-desktop">{s.top[0]}</span><i/><span className="top-copy-desktop">{s.top[1]}</span><i/><span className="top-copy-desktop">{s.top[2]}</span><div className="strip-route"><b>{s.stops[0]}</b><span>{s.stops[1]}</span><span>{s.stops[2]}</span><span>{s.stops[3]}</span></div></div>
     <header className="site-header">
@@ -910,7 +919,7 @@ export default function Home() {
 
       <div className="hero" id="route">
         <div className="hero-copy"><span className="eyebrow"><i/>{t.eyebrow}</span><h1>{t.title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1><p>{t.subtitle}</p>
-          <div className="hero-actions"><a className="primary-cta" href="#products">{t.cta}<Icon name="arrow"/></a></div>
+          <div className="hero-actions"><a className="primary-cta" href="#products">{t.cta}<Icon name="arrow"/></a><button className="hero-contact-cta" type="button" onClick={() => openCustomerService("whatsapp")}>{sc.heroContact}</button></div>
         </div>
         <div className="hero-price-shell">
           <section
@@ -1046,6 +1055,8 @@ export default function Home() {
     </section>
     </>}
 
+    <CustomerServiceDock lang={lang} onRequest={openCustomerService}/>
+
     {quoteCount > 0 && <button className={`quote-tab ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen((open) => !open)} aria-label={`${iq.list}: ${quoteCount}`} title={`${iq.list}: ${quoteCount}`}>
       <Icon name="cart"/><span>{iq.list}</span><b>{quoteCount}</b>
     </button>}
@@ -1053,11 +1064,11 @@ export default function Home() {
     {drawerOpen && <button className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-label={iq.close}/>}
     <aside id="inquiry-drawer" className={`inquiry-drawer ${drawerOpen ? "open" : ""}`} role="dialog" aria-modal="true" aria-labelledby="inquiry-title" aria-hidden={!drawerOpen}>
       <header className="drawer-header">
-        <div><span>{iq.list} · {quoteCount}</span><h2 id="inquiry-title">{iq.title}</h2><p>{iq.subtitle}</p></div>
+        <div><span>{quoteCount > 0 ? `${iq.list} · ${quoteCount}` : sc.manager}</span><h2 id="inquiry-title">{quoteCount > 0 ? iq.title : sc.genericTitle}</h2><p>{quoteCount > 0 ? iq.subtitle : sc.genericSubtitle}</p></div>
         <button onClick={() => setDrawerOpen(false)} aria-label={iq.close}>×</button>
       </header>
 
-      {quoteCount === 0 ? <div className="drawer-empty"><Icon name="cart"/><p>{iq.empty}</p><button onClick={() => { setDrawerOpen(false); document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" }); }}>{t.cta}</button></div> : <>
+      {quoteCount === 0 ? <div className="drawer-contact-intro"><b>01</b><p>{sc.genericHint}</p><button type="button" onClick={() => { setDrawerOpen(false); document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" }); }}>{t.cta}</button></div> :
         <div className="inquiry-products">
           {selectedProducts.map((product) => <article key={product.kind}>
             <Image src={`${BASE_PATH}${product.image}`} alt="" width={58} height={58} sizes="58px"/>
@@ -1076,9 +1087,9 @@ export default function Home() {
             </dl>
             <p>{iq.exchange} · {currency}</p>
           </section>
-        </div>
+        </div>}
 
-        <form className="contact-form" onSubmit={submitInquiry}>
+      <form className="contact-form" onSubmit={submitInquiry}>
           <label className="field full"><span>{iq.destination}</span><select name="destination" defaultValue={destinationOptions[0]}>{destinationOptions.map((city) => <option key={city}>{city}</option>)}</select></label>
           <label className="field full"><span>{iq.phone} *</span><div className="phone-field"><select name="phoneCountryCode" key={market} defaultValue={market === "kg" ? "+996" : "+998"}><option>+996</option><option>+998</option><option>+7</option><option>+86</option></select><input name="phone" type="tel" inputMode="tel" autoComplete="tel" required placeholder="000 000 000"/></div></label>
           <label className="check-field full"><input type="checkbox" checked={sameWhatsapp} onChange={(event) => setSameWhatsapp(event.target.checked)}/><span>{iq.sameWhatsapp}</span></label>
@@ -1091,8 +1102,7 @@ export default function Home() {
           <button className="submit-inquiry full" type="submit">{iq.submit}<Icon name="arrow"/></button>
           <p className="response-note full">{iq.response}<span>{iq.free}</span></p>
           {submitted && <div className="inquiry-success full" role="status">✓ {iq.success}</div>}
-        </form>
-      </>}
+      </form>
     </aside>
 
     <footer><Logo variant={logoVariant} lang={lang}/><p>{s.footerTagline}</p><nav aria-label="Legal"><Link href="/company">{lang === "zh" ? "公司信息" : "О компании"}</Link><Link href="/privacy">{lang === "zh" ? "隐私政策" : "Конфиденциальность"}</Link></nav><span>{s.copyright}</span></footer>
