@@ -429,6 +429,20 @@ const currencyOptions: Array<{ code: Currency; label: string; perCny: number; lo
   { code: "RUB", label: "RUB ₽", perCny: 11.3, locale: "ru-RU", digits: 0 },
 ];
 
+const localePanelCopy: Record<Lang, { title: string; done: string; close: string }> = {
+  ru: { title: "Язык и валюта", done: "Готово", close: "Закрыть" },
+  ky: { title: "Тил жана акча бирдиги", done: "Даяр", close: "Жабуу" },
+  uz: { title: "Til va valyuta", done: "Tayyor", close: "Yopish" },
+  zh: { title: "语言与货币", done: "完成", close: "关闭" },
+};
+
+const mobileTopCopy: Record<Lang, string> = {
+  ru: "Закупки в Иу · Ж/д КНР–КР–УЗ",
+  ky: "Иу сатып алуу · КЭР–КР–ӨзР темир жолу",
+  uz: "Iu xaridi · XXR–QR–O‘zR temir yo‘li",
+  zh: "义乌集采 · 中吉乌铁路专线",
+};
+
 const priceNumber = (value: string) => Number(value.replace(/[^\d.]/g, ""));
 
 function formatCurrency(cnyValue: number, currency: Currency) {
@@ -607,6 +621,7 @@ export default function Home() {
   const [preferredContact, setPreferredContact] = useState<"phone" | "whatsapp" | "email">("phone");
   const [submitted, setSubmitted] = useState(false);
   const [showBrand, setShowBrand] = useState(false);
+  const [localeOpen, setLocaleOpen] = useState(false);
   const [logoVariant, setLogoVariant] = useState<LogoVariant>(1);
   const [heroSlide, setHeroSlide] = useState(0);
   const [heroPaused, setHeroPaused] = useState(false);
@@ -622,6 +637,7 @@ export default function Home() {
   const tc = trustStoryCopy[lang];
   const hc = heroComparisonCopy[lang];
   const nc = newsCopy[lang];
+  const localeUi = localePanelCopy[lang];
   const detailLabel = { ru: "Подробнее", ky: "Толугураак", uz: "Batafsil", zh: "查看详情" }[lang];
   const loadMoreLabel = { ru: "Показать ещё", ky: "Дагы көрсөтүү", uz: "Yana ko‘rsatish", zh: "加载更多" }[lang];
   const showingLabel = { ru: "Показано", ky: "Көрсөтүлдү", uz: "Ko‘rsatildi", zh: "已显示" }[lang];
@@ -644,9 +660,9 @@ export default function Home() {
   }, [lang]);
 
   useEffect(() => {
-    document.body.style.overflow = drawerOpen ? "hidden" : "";
+    document.body.style.overflow = drawerOpen || localeOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [drawerOpen]);
+  }, [drawerOpen, localeOpen]);
 
   useEffect(() => {
     if (heroPaused || drawerOpen || showBrand || activeNewsId || heroProducts.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -665,6 +681,13 @@ export default function Home() {
     window.addEventListener("keydown", closeNews);
     return () => window.removeEventListener("keydown", closeNews);
   }, []);
+
+  useEffect(() => {
+    if (!localeOpen) return;
+    const closeLocale = (event: KeyboardEvent) => { if (event.key === "Escape") setLocaleOpen(false); };
+    window.addEventListener("keydown", closeLocale);
+    return () => window.removeEventListener("keydown", closeLocale);
+  }, [localeOpen]);
 
   const retailInCny = (product: (typeof products)[number]) => {
     const sourceCurrency: Currency = market === "kg" ? "KGS" : "UZS";
@@ -747,8 +770,8 @@ export default function Home() {
     setSubmitted(true);
   };
 
-  return <main className={`market-shell currency-${currency.toLowerCase()}`}>
-    <div className="top-strip"><span>{s.top[0]}</span><i/><span>{s.top[1]}</span><i/><span>{s.top[2]}</span><div className="strip-route"><b>{s.stops[0]}</b><span>{s.stops[1]}</span><span>{s.stops[2]}</span><span>{s.stops[3]}</span></div></div>
+  return <main className={`market-shell currency-${currency.toLowerCase()} lang-${lang}`}>
+    <div className="top-strip"><span className="top-copy-mobile">{mobileTopCopy[lang]}</span><span className="top-copy-desktop">{s.top[0]}</span><i/><span className="top-copy-desktop">{s.top[1]}</span><i/><span className="top-copy-desktop">{s.top[2]}</span><div className="strip-route"><b>{s.stops[0]}</b><span>{s.stops[1]}</span><span>{s.stops[2]}</span><span>{s.stops[3]}</span></div></div>
     <header className="site-header">
       <Logo variant={logoVariant} lang={lang}/>
       <nav aria-label={s.navLabel}>{t.nav.map((item, i) => <a href={i === 0 ? "#categories" : i === 2 ? "#route" : "#products"} key={item}>{item}</a>)}</nav>
@@ -756,11 +779,23 @@ export default function Home() {
         <label className="language-select" data-code={lang === "zh" ? "中" : lang.toUpperCase()}><span className="sr-only">{s.languageLabel}</span><select value={lang} onChange={(e) => { setLang(e.target.value as Lang); setVisibleCount(9); setNotice(""); }}>{(Object.keys(copy) as Lang[]).map((key) => <option key={key} value={key}>{copy[key].label}</option>)}</select></label>
         <label className="currency-select"><span className="sr-only">{s.currencyLabel}</span><select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>{currencyOptions.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
       </div>
+      <button className="mobile-locale-trigger" type="button" onClick={() => { setLocaleOpen(true); setDrawerOpen(false); setActiveNewsId(null); }} aria-expanded={localeOpen} aria-controls="mobile-locale-panel" aria-label={`${s.languageLabel}: ${copy[lang].label}; ${s.currencyLabel}: ${currency}`}>
+        <span>{lang === "zh" ? "中" : lang.toUpperCase()}</span><i aria-hidden="true"/><b>{currency}</b><small aria-hidden="true">⌄</small>
+      </button>
     </header>
+    {localeOpen && <>
+      <button className="locale-backdrop" type="button" onClick={() => setLocaleOpen(false)} aria-label={localeUi.close}/>
+      <section className="locale-panel" id="mobile-locale-panel" role="dialog" aria-modal="true" aria-labelledby="mobile-locale-title">
+        <header className="locale-panel-header"><div><small>{s.languageLabel} · {s.currencyLabel}</small><h2 id="mobile-locale-title">{localeUi.title}</h2></div><button type="button" onClick={() => setLocaleOpen(false)} aria-label={localeUi.close}>×</button></header>
+        <fieldset><legend>{s.languageLabel}</legend><div className="locale-options language-options">{(Object.keys(copy) as Lang[]).map((key) => <button type="button" className={lang === key ? "active" : ""} key={key} onClick={() => { setLang(key); setVisibleCount(9); setNotice(""); }}><b>{key === "zh" ? "中" : key.toUpperCase()}</b><span>{copy[key].label}</span></button>)}</div></fieldset>
+        <fieldset><legend>{s.currencyLabel}</legend><div className="locale-options currency-options">{currencyOptions.map((item) => <button type="button" className={currency === item.code ? "active" : ""} key={item.code} onClick={() => setCurrency(item.code)}><b>{item.code}</b><span>{item.label}</span></button>)}</div></fieldset>
+        <button className="locale-done" type="button" onClick={() => setLocaleOpen(false)}>{localeUi.done}</button>
+      </section>
+    </>}
     {notice && <button className="toast" onClick={() => setNotice("")}>{notice}<b>×</b></button>}
     {showBrand ? <BrandGuide onClose={() => setShowBrand(false)} selected={logoVariant} onSelect={setLogoVariant}/> : <>
     <section className="workspace">
-      <aside className="news-rail" aria-label={nc.title} onMouseLeave={() => setActiveNewsId(null)}>
+      <aside className="news-rail" aria-label={nc.title} onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveNewsId(null); }}>
         <header className="news-rail-heading"><span>{nc.eyebrow}</span><h2>{nc.title}</h2><small><i/>{nc.verified}</small></header>
         <div className="news-list">
           {logisticsNews.map((item) => {
@@ -768,10 +803,10 @@ export default function Home() {
             return <button
               className={`news-item ${selected ? "active" : ""}`}
               key={item.id}
-              onMouseEnter={() => setActiveNewsId(item.id)}
-              onFocus={() => setActiveNewsId(item.id)}
+              onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveNewsId(item.id); }}
               onClick={() => setActiveNewsId(item.id)}
               aria-expanded={selected}
+              aria-haspopup="dialog"
               aria-controls="news-detail"
             >
               <time dateTime={item.date}>{item.date.slice(5).replace("-", ".")}</time>
@@ -842,9 +877,11 @@ export default function Home() {
 
     <section className="search-band"><div className="search-box"><Icon name="search"/><input value={query} onChange={(e) => { setQuery(e.target.value); setVisibleCount(9); }} placeholder={t.search}/><button onClick={() => document.querySelector("#products")?.scrollIntoView({behavior:"smooth"})}>{t.cta}</button></div><div className="market-toggle"><span>{t.country}</span><button className={market === "kg" ? "active" : ""} onClick={() => setMarket("kg")}>🇰🇬 {s.kgCountry}</button><button className={market === "uz" ? "active" : ""} onClick={() => setMarket("uz")}>🇺🇿 {s.uzCountry}</button></div></section>
 
-    <div className="mobile-category-filter" aria-label={t.categories}>
-      <button className={!selectedCategory ? "active" : ""} onClick={() => { setSelectedCategory(null); setVisibleCount(9); }}>{t.all}<b>{products.length}</b></button>
-      {categories.map(([icon, names]) => <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => { setSelectedCategory(icon); setVisibleCount(9); }}>{names[lang]}<b>{products.filter((product) => productCategories[product.kind] === icon).length}</b></button>)}
+    <div className="mobile-category-shell">
+      <div className="mobile-category-filter" aria-label={t.categories}>
+        <button className={!selectedCategory ? "active" : ""} onClick={() => { setSelectedCategory(null); setVisibleCount(9); }}>{t.all}<b>{products.length}</b></button>
+        {categories.map(([icon, names]) => <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => { setSelectedCategory(icon); setVisibleCount(9); }}>{names[lang]}<b>{products.filter((product) => productCategories[product.kind] === icon).length}</b></button>)}
+      </div>
     </div>
 
     <section className="products-section" id="products">
