@@ -6,11 +6,19 @@ export type Product = {
   moq: number;
   orders: number;
   kind: string;
+  badge: ProductBadge | null;
 };
+
+export type ProductBadge = "hot" | "low-moq";
+
+export const productBadgeRules = {
+  hotProductCount: 3,
+  lowMoqMaximum: 30,
+} as const;
 
 const productName = (ru: string, uz: string, zh: string) => ({ ru, ky: ru, uz, zh });
 
-export const catalogProducts: Product[] = [
+const rawCatalogProducts: Array<Omit<Product, "badge">> = [
   { name: productName("Защитное стекло для смартфона", "Telefon uchun himoya oynasi", "手机钢化膜"), image: "/products/01-tempered-glass-screen-protectors.jpg", cost: "¥ 0.45", retail: { kg: "120 сом", uz: "17 000 so‘m" }, moq: 500, orders: 2358, kind: "screen-protector" },
   { name: productName("Прозрачный противоударный чехол", "Shaffof zarbaga chidamli g‘ilof", "透明防摔手机壳"), image: "/products/02-clear-shockproof-phone-case.jpg", cost: "¥ 2.80", retail: { kg: "350 сом", uz: "49 000 so‘m" }, moq: 100, orders: 1846, kind: "phone-case" },
   { name: productName("Плетёный кабель быстрой зарядки USB-C", "O‘ralgan USB-C tezkor quvvat kabeli", "编织USB-C快充线"), image: "/products/03-braided-usb-c-fast-charge-cable.jpg", cost: "¥ 5.60", retail: { kg: "550 сом", uz: "75 000 so‘m" }, moq: 100, orders: 1527, kind: "usb-c-cable" },
@@ -42,6 +50,22 @@ export const catalogProducts: Product[] = [
   { name: productName("Магнитный светильник с датчиком движения", "Harakat sensorli magnit shkaf chirog‘i", "人体感应磁吸柜灯"), image: "/products/29-motion-sensor-magnetic-cabinet-light.jpg", cost: "¥ 15.80", retail: { kg: "1 580 сом", uz: "218 000 so‘m" }, moq: 30, orders: 746, kind: "sensor-light" },
   { name: productName("PTC-сушилка для обуви", "PTC poyabzal quritgichi", "PTC恒温烘鞋器"), image: "/products/30-ptc-shoe-dryer.jpg", cost: "¥ 28.50", retail: { kg: "2 850 сом", uz: "395 000 so‘m" }, moq: 20, orders: 584, kind: "shoe-dryer" },
 ];
+
+const hotProductKinds = new Set(
+  [...rawCatalogProducts]
+    .sort((first, second) => second.orders - first.orders)
+    .slice(0, productBadgeRules.hotProductCount)
+    .map((product) => product.kind),
+);
+
+export const catalogProducts: Product[] = rawCatalogProducts.map((product) => ({
+  ...product,
+  badge: hotProductKinds.has(product.kind)
+    ? "hot"
+    : product.moq <= productBadgeRules.lowMoqMaximum
+      ? "low-moq"
+      : null,
+}));
 
 export function getProduct(kind: string) {
   return catalogProducts.find((product) => product.kind === kind);

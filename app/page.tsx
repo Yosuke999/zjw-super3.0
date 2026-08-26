@@ -2,13 +2,76 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { BASE_PATH } from "./base-path";
+import { catalogProducts, type ProductBadge } from "./catalog";
+import { buildProductHref, currencyOptions, formatCurrency, formatExchangeRate, formatUnitCurrency, supportedCurrencies, type Currency } from "./currency";
+import { kyrgyzProductNames } from "./product-localization";
 
 type Lang = "ru" | "ky" | "uz" | "zh";
-type Currency = "CNY" | "KGS" | "UZS" | "RUB";
 type CategoryId = "home" | "fashion" | "tools" | "digital" | "auto" | "beauty";
 type LogoVariant = 1 | 2 | 3 | 4 | 5 | 6;
+
+const preferenceStorageKey = "central-asia-trade.preferences";
+const supportedLanguages: Lang[] = ["ru", "ky", "uz", "zh"];
+type Preferences = { lang: Lang; currency: Currency };
+
+const defaultPreferences: Preferences = { lang: "ru", currency: "KGS" };
+const preferenceSubscribers = new Set<() => void>();
+let currentPreferences = defaultPreferences;
+let cachedStoredPreferences: string | null | undefined;
+
+function parseStoredPreferences(raw: string | null): Preferences {
+  if (!raw) return defaultPreferences;
+  try {
+    const parsed = JSON.parse(raw) as { lang?: string; currency?: string };
+    return {
+      lang: supportedLanguages.includes(parsed.lang as Lang) ? parsed.lang as Lang : defaultPreferences.lang,
+      currency: supportedCurrencies.includes(parsed.currency as Currency) ? parsed.currency as Currency : defaultPreferences.currency,
+    };
+  } catch {
+    return defaultPreferences;
+  }
+}
+
+function getPreferencesSnapshot() {
+  if (typeof window === "undefined") return defaultPreferences;
+  try {
+    const stored = window.localStorage.getItem(preferenceStorageKey);
+    if (stored !== cachedStoredPreferences) {
+      cachedStoredPreferences = stored;
+      currentPreferences = parseStoredPreferences(stored);
+    }
+  } catch {
+    // Keep the in-memory preference when browser storage is unavailable.
+  }
+  return currentPreferences;
+}
+
+function subscribeToPreferences(callback: () => void) {
+  preferenceSubscribers.add(callback);
+  const syncFromAnotherTab = (event: StorageEvent) => {
+    if (event.key !== preferenceStorageKey) return;
+    cachedStoredPreferences = undefined;
+    callback();
+  };
+  window.addEventListener("storage", syncFromAnotherTab);
+  return () => {
+    preferenceSubscribers.delete(callback);
+    window.removeEventListener("storage", syncFromAnotherTab);
+  };
+}
+
+function savePreferences(preferences: Preferences) {
+  currentPreferences = preferences;
+  cachedStoredPreferences = JSON.stringify(preferences);
+  try {
+    window.localStorage.setItem(preferenceStorageKey, cachedStoredPreferences);
+  } catch {
+    // The preference still works for the current page when storage is blocked.
+  }
+  preferenceSubscribers.forEach((notifyPreferenceChange) => notifyPreferenceChange());
+}
 
 const logoOptions: Array<{ id: LogoVariant; name: string; idea: string; fit: string; file: string }> = [
   { id: 1, name: "丝路门廊", idea: "门廊与铁路合一，延续第一版最完整的丝路文化记忆。", fit: "综合推荐 · 品牌官网", file: "logo-01-silk-gate" },
@@ -74,7 +137,9 @@ const inquiryCopy = {
     preferred: "Предпочтительный способ связи", phoneFirst: "Телефон", whatsappFirst: "WhatsApp", emailFirst: "Почта", note: "Комментарий",
     notePlaceholder: "Нужные модели, цвета, сроки или другие пожелания", submit: "Отправить запрос и ждать звонка",
     response: "В рабочее время свяжемся с вами в течение 30 минут.", free: "Бесплатный расчёт · без обязательства заказывать",
-    success: "Запрос подготовлен. Мы свяжемся с вами по телефону.", close: "Закрыть", exchange: "Ориентировочный пересчёт",
+    success: "Запрос подготовлен. Мы свяжемся с вами по телефону.", close: "Закрыть", exchange: "Ориентировочный курс",
+    subtotal: "Стоимость товаров", rate: "Курс пересчёта", excluded: "Не включено в сумму",
+    excludedDetail: "Доставка, налоги и сервисный сбор будут указаны после ручного расчёта.",
   },
   ky: {
     add: "Сурамга кошуу", added: "Кошулду", list: "Сурам", title: "Жеткирүү менен так бааны алыңыз",
@@ -85,6 +150,8 @@ const inquiryCopy = {
     notePlaceholder: "Модель, түс, мөөнөт же башка каалоолор", submit: "Сурам жөнөтүп, чалууну күтүү",
     response: "Иш убактысында 30 мүнөттүн ичинде байланышабыз.", free: "Акысыз эсеп · сатып алуу милдеттүү эмес",
     success: "Сурам даяр. Биз сизге телефон аркылуу байланышабыз.", close: "Жабуу", exchange: "Болжолдуу курс",
+    subtotal: "Товардын суммасы", rate: "Эсептөө курсу", excluded: "Суммага кирген жок",
+    excludedDetail: "Жеткирүү, салыктар жана тейлөө акысы кол менен эсептелгенден кийин көрсөтүлөт.",
   },
   uz: {
     add: "So‘rovga qo‘shish", added: "Qo‘shildi", list: "So‘rov", title: "Yetkazib berish bilan aniq narxni oling",
@@ -95,6 +162,8 @@ const inquiryCopy = {
     notePlaceholder: "Model, rang, muddat yoki boshqa istaklar", submit: "So‘rov yuborish va qo‘ng‘iroqni kutish",
     response: "Ish vaqtida 30 daqiqa ichida bog‘lanamiz.", free: "Bepul hisob-kitob · buyurtma majburiy emas",
     success: "So‘rov tayyor. Siz bilan telefon orqali bog‘lanamiz.", close: "Yopish", exchange: "Taxminiy kurs",
+    subtotal: "Mahsulotlar summasi", rate: "Hisoblash kursi", excluded: "Summaga kiritilmagan",
+    excludedDetail: "Yetkazish, soliqlar va xizmat haqi qo‘lda hisoblangandan keyin ko‘rsatiladi.",
   },
   zh: {
     add: "加入询价单", added: "已加入", list: "询价单", title: "获取准确到货价",
@@ -105,6 +174,8 @@ const inquiryCopy = {
     notePlaceholder: "需要的型号、颜色、交期或其他要求", submit: "提交询价，等待电话联系",
     response: "工作时间内，我们将在 30 分钟内与您联系。", free: "免费报价 · 不产生订购义务",
     success: "询价信息已准备，我们会优先通过电话与您联系。", close: "关闭", exchange: "参考汇率换算",
+    subtotal: "商品小计", rate: "参考汇率", excluded: "暂未计入",
+    excludedDetail: "物流、税费及服务费将在人工核价后单独列明。",
   },
 } as const;
 
@@ -134,6 +205,13 @@ const siteCopy = {
     save: "收藏商品", logisticsNotice: "物流测算将在下一步采购流程中开放。", languageLabel: "语言", currencyLabel: "货币", navLabel: "主导航",
   },
 } as const;
+
+const productBadgeCopy: Record<Lang, Record<ProductBadge, string>> = {
+  ru: { hot: "ХИТ", "low-moq": "МАЛАЯ ПАРТИЯ" },
+  ky: { hot: "СУРОО-ТАЛАПТА", "low-moq": "АЗ ПАРТИЯ" },
+  uz: { hot: "OMMABOP", "low-moq": "KAM PARTIYA" },
+  zh: { hot: "热销", "low-moq": "低起订量" },
+};
 
 const heroComparisonCopy = {
   ru: {
@@ -400,19 +478,6 @@ const trustStoryImages = [
   "/trust/05-delivery.jpg",
 ] as const;
 
-const kyrgyzProductNames: Record<string, string> = {
-  "screen-protector": "Смартфон үчүн коргоочу айнек", "phone-case": "Тунук соккуга чыдамдуу кап", "usb-c-cable": "Өрүлгөн USB-C тез кубаттоо кабели",
-  "phone-stand": "Бүктөлүүчү үстөл телефон кармагычы", "car-holder": "Унаанын желдеткичине телефон кармагыч", "selfie-stick": "Штативдүү селфи таякчасы",
-  "cable-organizer": "Кабель коргоочу жана иреттегич топтом", "hair-set": "Чач кыскычтар жана резинкалар топтому", "makeup-sponge": "Макияж губкасы жана пуф топтому",
-  "curling-ribbon": "Жылуулуксуз чач тармалдатуучу лента", "nail-set": "Тырмак чаптамалары жана жасалма тырмактар", "scarf-clasp": "Жоолук үчүн магниттик илгичтер жана брошкалар",
-  "jewelry-box": "Саякаттык зер буюмдар кутусу", "adhesive-hooks": "Тешпей жабыштырылуучу илгичтер", "drain-strainer": "Суу агызгыч чыпкалар топтому",
-  "vacuum-bags": "Вакуумдук кысуучу баштыктар топтому", "drawer-organizer": "Тартма бөлгүч жана ич кийим иреттегич", "travel-organizer": "Бут кийим кабы жана саякат иреттегичтери",
-  "gap-strip": "Раковина жана меш үчүн силикон тилкелер", "car-towels": "Унаа үчүн микрофибра сүлгүлөр", "seat-organizer": "Унаа отургуч аралыгына иреттегич",
-  "sunshade": "Алдыңкы айнекке бүктөлүүчү күн калкалоочу чатыр", "frost-cover": "Алдыңкы айнекке кышкы кар капкак", "uv-set": "Күндөн коргоочу жеңдер жана бет кап",
-  "winter-gloves": "Сенсордук экранга кышкы мээлейлер", "lint-remover": "USB-C түк тазалагыч", "bag-sealer": "USB-C кичи пакет жапкыч",
-  "usb-fan": "Колго жана үстөлгө USB-C желдеткич", "sensor-light": "Кыймыл сенсорлуу магниттик чырак", "shoe-dryer": "PTC бут кийим кургаткыч",
-};
-
 const deliveryCities: Record<"kg" | "uz", Record<Lang, string[]>> = {
   kg: {
     ru: ["Бишкек", "Ош", "Каракол"], ky: ["Бишкек", "Ош", "Каракол"], uz: ["Bishkek", "O‘sh", "Qorako‘l"], zh: ["比什凯克", "奥什", "卡拉科尔"],
@@ -421,13 +486,6 @@ const deliveryCities: Record<"kg" | "uz", Record<Lang, string[]>> = {
     ru: ["Ташкент", "Самарканд", "Андижан"], ky: ["Ташкент", "Самарканд", "Анжиян"], uz: ["Toshkent", "Samarqand", "Andijon"], zh: ["塔什干", "撒马尔罕", "安集延"],
   },
 };
-
-const currencyOptions: Array<{ code: Currency; label: string; perCny: number; locale: string; digits: number }> = [
-  { code: "CNY", label: "CNY ¥", perCny: 1, locale: "zh-CN", digits: 2 },
-  { code: "KGS", label: "KGS", perCny: 12.2, locale: "ru-RU", digits: 0 },
-  { code: "UZS", label: "UZS", perCny: 1750, locale: "uz-UZ", digits: 0 },
-  { code: "RUB", label: "RUB ₽", perCny: 11.3, locale: "ru-RU", digits: 0 },
-];
 
 const localePanelCopy: Record<Lang, { title: string; done: string; close: string }> = {
   ru: { title: "Язык и валюта", done: "Готово", close: "Закрыть" },
@@ -445,13 +503,8 @@ const mobileTopCopy: Record<Lang, string> = {
 
 const priceNumber = (value: string) => Number(value.replace(/[^\d.]/g, ""));
 
-function formatCurrency(cnyValue: number, currency: Currency) {
-  const option = currencyOptions.find((item) => item.code === currency) ?? currencyOptions[0];
-  const value = cnyValue * option.perCny;
-  const formatted = new Intl.NumberFormat(option.locale, { maximumFractionDigits: option.digits, minimumFractionDigits: option.digits }).format(value);
-  if (currency === "CNY") return `¥ ${formatted}`;
-  if (currency === "RUB") return `₽ ${formatted}`;
-  return `${currency} ${formatted}`;
+function supportsPreciseHover() {
+  return typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 }
 
 const productName = (ru: string, uz: string, zh: string) => ({ ru, ky: ru, uz, zh });
@@ -490,6 +543,7 @@ const products = [
 ];
 
 const heroProductKinds = ["phone-case", "screen-protector", "bag-sealer"] as const;
+const productBadgeByKind = new Map(catalogProducts.map((product) => [product.kind, product.badge]));
 
 const productCategories: Record<string, CategoryId> = {
   "screen-protector": "digital", "phone-case": "digital", "usb-c-cable": "digital", "phone-stand": "digital",
@@ -609,8 +663,10 @@ function BrandGuide({ onClose, selected, onSelect }: { onClose: () => void; sele
 }
 
 export default function Home() {
-  const [lang, setLang] = useState<Lang>("ru");
-  const [currency, setCurrency] = useState<Currency>("KGS");
+  const preferences = useSyncExternalStore(subscribeToPreferences, getPreferencesSnapshot, () => defaultPreferences);
+  const { lang, currency } = preferences;
+  const setLang = (nextLang: Lang) => savePreferences({ ...getPreferencesSnapshot(), lang: nextLang });
+  const setCurrency = (nextCurrency: Currency) => savePreferences({ ...getPreferencesSnapshot(), currency: nextCurrency });
   const [market, setMarket] = useState<"kg" | "uz">("kg");
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [query, setQuery] = useState("");
@@ -629,6 +685,7 @@ export default function Home() {
   const [trustSlide, setTrustSlide] = useState(0);
   const [trustPaused, setTrustPaused] = useState(false);
   const [activeNewsId, setActiveNewsId] = useState<string | null>(null);
+  const newsGesture = useRef({ pointerId: null as number | null, startX: 0, startY: 0, dragged: false });
   const [visibleCount, setVisibleCount] = useState(9);
   const t = copy[lang];
   const iq = inquiryCopy[lang];
@@ -642,6 +699,7 @@ export default function Home() {
   const loadMoreLabel = { ru: "Показать ещё", ky: "Дагы көрсөтүү", uz: "Yana ko‘rsatish", zh: "加载更多" }[lang];
   const showingLabel = { ru: "Показано", ky: "Көрсөтүлдү", uz: "Ko‘rsatildi", zh: "已显示" }[lang];
   const productLabel = (product: (typeof products)[number]) => lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang];
+  const productHref = (kind: string) => buildProductHref(kind, lang, currency);
   const heroProducts = useMemo(() => heroProductKinds.map((kind) => products.find((product) => product.kind === kind)).filter((product): product is (typeof products)[number] => Boolean(product)), []);
   const filteredProducts = useMemo(() => products.filter((product) => {
     const matchesCategory = !selectedCategory || productCategories[product.kind] === selectedCategory;
@@ -652,6 +710,7 @@ export default function Home() {
   const activeCategory = categories.find(([id]) => id === selectedCategory);
   const selectedProducts = products.filter((product) => quoteItems[product.kind]);
   const quoteCount = selectedProducts.length;
+  const quoteSubtotalCny = selectedProducts.reduce((total, product) => total + priceNumber(product.cost) * quoteItems[product.kind], 0);
   const destinationOptions = deliveryCities[market][lang];
   const activeNews = logisticsNews.find((item) => item.id === activeNewsId);
 
@@ -795,7 +854,7 @@ export default function Home() {
     {notice && <button className="toast" onClick={() => setNotice("")}>{notice}<b>×</b></button>}
     {showBrand ? <BrandGuide onClose={() => setShowBrand(false)} selected={logoVariant} onSelect={setLogoVariant}/> : <>
     <section className="workspace">
-      <aside className="news-rail" aria-label={nc.title} onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveNewsId(null); }}>
+      <aside className="news-rail" aria-label={nc.title} onPointerLeave={(event) => { if (event.pointerType === "mouse" && supportsPreciseHover()) setActiveNewsId(null); }}>
         <header className="news-rail-heading"><span>{nc.eyebrow}</span><h2>{nc.title}</h2><small><i/>{nc.verified}</small></header>
         <div className="news-list">
           {logisticsNews.map((item) => {
@@ -803,8 +862,25 @@ export default function Home() {
             return <button
               className={`news-item ${selected ? "active" : ""}`}
               key={item.id}
-              onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveNewsId(item.id); }}
-              onClick={() => setActiveNewsId(item.id)}
+              onPointerEnter={(event) => { if (event.pointerType === "mouse" && supportsPreciseHover()) setActiveNewsId(item.id); }}
+              onPointerDown={(event) => {
+                if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+                newsGesture.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, dragged: false };
+              }}
+              onPointerMove={(event) => {
+                const gesture = newsGesture.current;
+                if (gesture.pointerId !== event.pointerId || gesture.dragged) return;
+                if (Math.abs(event.clientX - gesture.startX) > 10 || Math.abs(event.clientY - gesture.startY) > 10) gesture.dragged = true;
+              }}
+              onClick={(event) => {
+                const wasDrag = event.detail > 0 && newsGesture.current.dragged;
+                newsGesture.current = { pointerId: null, startX: 0, startY: 0, dragged: false };
+                if (wasDrag) {
+                  event.preventDefault();
+                  return;
+                }
+                setActiveNewsId(item.id);
+              }}
               aria-expanded={selected}
               aria-haspopup="dialog"
               aria-controls="news-detail"
@@ -837,7 +913,7 @@ export default function Home() {
           <div className="hero-actions"><a className="primary-cta" href="#products">{t.cta}<Icon name="arrow"/></a></div>
         </div>
         <div className="hero-price-shell">
-          {heroProduct && <section
+          <section
             className="hero-price-carousel"
             role="region"
             aria-roledescription="carousel"
@@ -855,22 +931,22 @@ export default function Home() {
           >
             <div className="hero-price-slide" key={`${heroProduct.kind}-${market}-${currency}-${lang}`} aria-live="polite">
               <header className="hero-price-head">
-                <Image src={`${BASE_PATH}${heroProduct.image}`} alt={productLabel(heroProduct)} width={52} height={52} sizes="52px"/>
+                <Image src={`${BASE_PATH}${heroProduct.image}`} alt={productLabel(heroProduct)} width={52} height={52} sizes="52px" priority={heroSlide === 0}/>
                 <div><strong>{productLabel(heroProduct)}</strong><span>{hc.label} · {t.moq} {heroProduct.moq} {t.pieces}</span></div>
                 <small>{market === "kg" ? s.kgCity : s.uzCity}</small>
               </header>
               <div className="hero-price-compare">
-                <div className="hero-price-value"><span>{hc.source}</span><strong>{formatCurrency(heroCostCny, currency)}</strong><small>{hc.verified}</small></div>
+                <div className="hero-price-value"><span>{hc.source}</span><strong>{formatUnitCurrency(heroCostCny, currency)}</strong><small>{hc.verified}</small></div>
                 <i aria-hidden="true">→</i>
-                <div className="hero-price-value local"><span>{hc.local}</span><strong>{formatCurrency(heroRetailCny, currency)}</strong><small>{hc.reference}</small></div>
+                <div className="hero-price-value local"><span>{hc.local}</span><strong>{formatUnitCurrency(heroRetailCny, currency)}</strong><small>{hc.reference}</small></div>
               </div>
               <div className="hero-price-result">
-                <div><span>{hc.gap}</span><strong>+{formatCurrency(heroGapCny, currency)}</strong><small>{hc.disclaimer}</small></div>
+                <div><span>{hc.gap}</span><strong>+{formatUnitCurrency(heroGapCny, currency)}</strong><small>{hc.disclaimer}</small></div>
                 <b aria-hidden="true">{String(heroSlide + 1).padStart(2, "0")} / {String(heroProducts.length).padStart(2, "0")}</b>
               </div>
             </div>
             <div className="hero-carousel-dots">{heroProducts.map((product, index) => <button key={product.kind} className={index === heroSlide ? "active" : ""} onClick={() => setHeroSlide(index)} aria-label={`${hc.show} ${index + 1}`} aria-current={index === heroSlide ? "true" : undefined}/>)}</div>
-          </section>}
+          </section>
         </div>
       </div>
     </section>
@@ -899,18 +975,19 @@ export default function Home() {
       </aside>
       <div className="product-grid">{shownProducts.map((product) => {
         const isAdded = Boolean(quoteItems[product.kind]);
+        const badge = productBadgeByKind.get(product.kind);
         return <article className={`product-card ${isAdded ? "in-quote" : ""}`} key={product.kind}>
-          <Link className="product-image" href={`/products/${product.kind}`} aria-label={`${detailLabel}: ${productLabel(product)}`}><span className="product-badge">{market === "kg" ? "KG" : "UZ"} {s.badge}</span><Image src={`${BASE_PATH}${product.image}`} alt={productLabel(product)} fill loading="lazy" sizes="(max-width: 760px) 50vw, (max-width: 1050px) 50vw, 33vw"/></Link>
+          <Link className="product-image" href={productHref(product.kind)} aria-label={`${detailLabel}: ${productLabel(product)}`}>{badge && <span className={`product-badge ${badge}`}>{productBadgeCopy[lang][badge]}</span>}<Image src={`${BASE_PATH}${product.image}`} alt={productLabel(product)} fill loading="lazy" sizes="(max-width: 760px) 50vw, (max-width: 1050px) 50vw, 33vw"/></Link>
           <div className="product-info">
-            <h3><Link href={`/products/${product.kind}`}>{productLabel(product)}</Link></h3>
+            <h3><Link href={productHref(product.kind)}>{productLabel(product)}</Link></h3>
             <div className="product-pricing">
-              <div className="price-block purchase"><span>{t.chinaPrice}</span><strong>{formatCurrency(priceNumber(product.cost), currency)}</strong></div>
+              <div className="price-block purchase"><span>{t.chinaPrice}</span><strong>{formatUnitCurrency(priceNumber(product.cost), currency)}</strong></div>
               <div className="price-block retail"><span>{t.localPrice}</span><strong>{formatCurrency(retailInCny(product), currency)}</strong></div>
             </div>
             <div className="product-meta"><span>{t.moq} {product.moq} {t.pieces}</span><span>{product.orders} {t.orders}</span></div>
             <div className="product-footer">
               <span><i/>{t.rail} → {market === "kg" ? s.kgCity : s.uzCity}</span>
-              <div><Link href={`/products/${product.kind}`}>{detailLabel}</Link><button className={isAdded ? "added" : ""} onClick={(event) => addToQuote(product, event.currentTarget.closest(".product-card"))} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button></div>
+              <div><Link href={productHref(product.kind)}>{detailLabel} <b aria-hidden="true">→</b></Link><button className={isAdded ? "added" : ""} onClick={(event) => addToQuote(product, event.currentTarget.closest(".product-card"))} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button></div>
             </div>
           </div>
         </article>;
@@ -986,12 +1063,19 @@ export default function Home() {
             <Image src={`${BASE_PATH}${product.image}`} alt="" width={58} height={58} sizes="58px"/>
             <div className="inquiry-product-copy">
               <h3>{productLabel(product)}</h3>
-              <span>{formatCurrency(priceNumber(product.cost), currency)} / {t.pieces}</span>
+              <span>{formatUnitCurrency(priceNumber(product.cost), currency)} / {t.pieces} × {quoteItems[product.kind]}</span>
               <label>{iq.quantity}<input type="number" min={product.moq} step="1" value={quoteItems[product.kind]} onChange={(event) => updateQuantity(product.kind, Number(event.target.value), product.moq)}/></label>
             </div>
-            <div className="inquiry-product-side"><strong>{formatCurrency(priceNumber(product.cost) * quoteItems[product.kind], currency)}</strong><button onClick={() => removeFromQuote(product.kind)}>{iq.remove}</button></div>
+            <div className="inquiry-product-side"><strong>{formatUnitCurrency(priceNumber(product.cost) * quoteItems[product.kind], currency)}</strong><button onClick={() => removeFromQuote(product.kind)}>{iq.remove}</button></div>
           </article>)}
-          <p className="exchange-note">{iq.exchange} · {currency}</p>
+          <section className="inquiry-breakdown" aria-label={iq.subtotal}>
+            <div className="inquiry-subtotal"><span>{iq.subtotal}</span><strong>{formatUnitCurrency(quoteSubtotalCny, currency)}</strong></div>
+            <dl>
+              <div><dt>{iq.rate}</dt><dd>{formatExchangeRate(currency)}</dd></div>
+              <div><dt>{iq.excluded}</dt><dd>{iq.excludedDetail}</dd></div>
+            </dl>
+            <p>{iq.exchange} · {currency}</p>
+          </section>
         </div>
 
         <form className="contact-form" onSubmit={submitInquiry}>
