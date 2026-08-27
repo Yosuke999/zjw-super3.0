@@ -2,6 +2,30 @@ export const inquiryStatuses = ["new", "contacted", "quoting", "won", "invalid"]
 
 export type InquiryStatus = (typeof inquiryStatuses)[number];
 
+export const analyticsEventNames = [
+  "page_view",
+  "product_view",
+  "product_card_click",
+  "search_performed",
+  "category_selected",
+  "market_changed",
+  "inquiry_item_added",
+  "inquiry_opened",
+  "inquiry_started",
+  "inquiry_validation_error",
+  "inquiry_submitted",
+  "contact_clicked",
+  "language_changed",
+  "currency_changed",
+  "page_engagement",
+  "page_error",
+  "web_vital",
+] as const;
+
+export type AnalyticsEventName = (typeof analyticsEventNames)[number];
+export type AnalyticsPropertyValue = string | number | boolean;
+export type AnalyticsProperties = Record<string, AnalyticsPropertyValue>;
+
 export const inquiryStatusLabels: Record<InquiryStatus, string> = {
   new: "新询价",
   contacted: "已联系",
@@ -70,6 +94,12 @@ export type AdminSnapshot = {
   trend: TrendPoint[];
   sources: RankedMetric[];
   pages: RankedMetric[];
+  tracking: {
+    eventCount: number;
+    identifiedViewRate: number;
+    lastEventAt: string;
+    funnel: Partial<Record<AnalyticsEventName, number>>;
+  };
   inquiries: InquiryRecord[];
   totalInquiries: number;
   inquiryPage: {

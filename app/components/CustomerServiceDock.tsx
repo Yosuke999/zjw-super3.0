@@ -9,6 +9,7 @@ import {
   type ContactMethod,
   type SiteLanguage,
 } from "../customer-service";
+import { trackAnalytics } from "../lib/analytics-client";
 
 type Props = {
   lang: SiteLanguage;
@@ -32,8 +33,9 @@ export default function CustomerServiceDock({ lang, context = "", onRequest }: P
 
   const contactControl = (method: ContactMethod, className: string, label: string, icon: ReactNode) => {
     const href = method === "phone" ? phoneHref : whatsappHref;
-    return href ? <a className={className} href={href} target={method === "whatsapp" ? "_blank" : undefined} rel={method === "whatsapp" ? "noreferrer" : undefined}>{icon}<span>{label}</span></a>
-      : <button className={className} type="button" onClick={() => onRequest(method)}>{icon}<span>{label}</span></button>;
+    const recordContact = () => void trackAnalytics("contact_clicked", { method, target: "customer-service" });
+    return href ? <a className={className} href={href} target={method === "whatsapp" ? "_blank" : undefined} rel={method === "whatsapp" ? "noreferrer" : undefined} onClick={recordContact}>{icon}<span>{label}</span></a>
+      : <button className={className} type="button" onClick={() => { recordContact(); onRequest(method); }}>{icon}<span>{label}</span></button>;
   };
 
   return <>

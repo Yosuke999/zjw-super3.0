@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { analyticsEventName, sanitizeAnalyticsProperties } from "../app/backend/analytics.ts";
 import { analyticsIdentifier, fingerprint, HttpError, readJson, trackablePath } from "../app/backend/http.ts";
 import { idempotencyKey, normalizeInquiryItems, totalInquiryCny } from "../app/backend/inquiry-validation.ts";
 import { emptyBusinessDates, periodStart, shanghaiDate } from "../app/backend/metrics.ts";
-import { allowRequest, createInquiry, getAdminSnapshot, updateInquiryStatus } from "../app/backend/server.ts";
+import { allowRequest, createInquiry, getAdminSnapshot, recordAnalytics, updateInquiryStatus } from "../app/backend/server.ts";
 
 test("server rebuilds inquiry product names and prices from the catalog", () => {
   const items = normalizeInquiryItems([{ kind: "screen-protector", name: "tampered", quantity: 600, unitPriceCny: 0.01 }], "zh");
@@ -28,6 +29,40 @@ test("analytics accepts only known paths and generated identifiers", () => {
   assert.equal(trackablePath("https://attacker.example/products/a"), "");
   assert.equal(analyticsIdentifier(`vis_${"a".repeat(32)}`, "vis"), `vis_${"a".repeat(32)}`);
   assert.equal(analyticsIdentifier("arbitrary", "vis"), "");
+});
+
+test("analytics accepts known behavior events and strips non-whitelisted or personal properties", () => {
+  assert.equal(analyticsEventName("inquiry_started"), "inquiry_started");
+  assert.equal(analyticsEventName("arbitrary_event"), "");
+  assert.deepEqual(sanitizeAnalyticsProperties({
+    productKind: "screen-protector",
+    queryLength: 14,
+    email: "customer@example.test",
+    note: "private message",
+    value: Number.POSITIVE_INFINITY,
+  }), { productKind: "screen-protector", queryLength: 14 });
+});
+
+test("development analytics store reports anonymous tracking completeness and funnel counts", async () => {
+  await recordAnalytics({
+    name: "page_view",
+    visitorId: `vis_${"d".repeat(32)}`,
+    sessionId: `ses_${"e".repeat(32)}`,
+    path: "/products/screen-protector",
+    referrer: "",
+    utmSource: "",
+    utmMedium: "",
+    utmCampaign: "",
+    language: "zh",
+    currency: "CNY",
+    market: "kg",
+    deviceType: "mobile",
+    properties: {},
+  });
+  const snapshot = await getAdminSnapshot(30, "all", "", 1, 10);
+  assert.ok(snapshot.tracking.eventCount >= 1);
+  assert.equal(snapshot.tracking.identifiedViewRate, 100);
+  assert.ok((snapshot.tracking.funnel.page_view ?? 0) >= 1);
 });
 
 test("request fingerprints are secret- and purpose-separated", async () => {

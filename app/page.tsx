@@ -9,7 +9,7 @@ import { buildProductHref, currencyOptions, formatCurrency, formatExchangeRate, 
 import { kyrgyzProductNames } from "./product-localization";
 import CustomerServiceDock from "./components/CustomerServiceDock";
 import { customerServiceCopy, type ContactMethod } from "./customer-service";
-import { getClientContext } from "./lib/analytics-client";
+import { getClientContext, trackAnalytics } from "./lib/analytics-client";
 import inquiryCopy from "./content/inquiry-copy.json";
 import logisticsNews from "./content/logistics-news.json";
 
@@ -459,8 +459,14 @@ function BrandGuide({ onClose, selected, onSelect }: { onClose: () => void; sele
 export default function Home() {
   const preferences = useSyncExternalStore(subscribeToPreferences, getPreferencesSnapshot, () => defaultPreferences);
   const { lang, currency } = preferences;
-  const setLang = (nextLang: Lang) => savePreferences({ ...getPreferencesSnapshot(), lang: nextLang });
-  const setCurrency = (nextCurrency: Currency) => savePreferences({ ...getPreferencesSnapshot(), currency: nextCurrency });
+  const setLang = (nextLang: Lang) => {
+    if (nextLang !== lang) void trackAnalytics("language_changed", { fromLanguage: lang, toLanguage: nextLang });
+    savePreferences({ ...getPreferencesSnapshot(), lang: nextLang });
+  };
+  const setCurrency = (nextCurrency: Currency) => {
+    if (nextCurrency !== currency) void trackAnalytics("currency_changed", { fromCurrency: currency, toCurrency: nextCurrency });
+    savePreferences({ ...getPreferencesSnapshot(), currency: nextCurrency });
+  };
   const [market, setMarket] = useState<"kg" | "uz">("kg");
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [query, setQuery] = useState("");
@@ -473,6 +479,7 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const inquiryIdempotencyKey = useRef("");
+  const inquiryFormStarted = useRef(false);
   const [showBrand, setShowBrand] = useState(false);
   const [localeOpen, setLocaleOpen] = useState(false);
   const [logoVariant, setLogoVariant] = useState<LogoVariant>(1);
@@ -600,9 +607,11 @@ export default function Home() {
 
   const addToQuote = (product: (typeof products)[number], source: HTMLElement | null = null) => {
     if (quoteItems[product.kind]) {
+      void trackAnalytics("inquiry_opened", { target: "product-card", productKind: product.kind, itemCount: quoteCount }, { market });
       setDrawerOpen(true);
       return;
     }
+    void trackAnalytics("inquiry_item_added", { productKind: product.kind, itemCount: quoteCount + 1 }, { market });
     setQuoteItems((current) => ({ ...current, [product.kind]: product.moq }));
     setSubmitted(false);
     animateProductToQuote(source);
@@ -664,6 +673,7 @@ export default function Home() {
   };
 
   const openCustomerService = (method: ContactMethod) => {
+    void trackAnalytics("inquiry_opened", { method, target: "customer-service", itemCount: quoteCount }, { market });
     setPreferredContact(method);
     setSubmitted(false);
     setDrawerOpen(true);
@@ -791,12 +801,12 @@ export default function Home() {
       </div>
     </section>
 
-    <section className="search-band"><div className="search-box"><Icon name="search"/><input value={query} onChange={(e) => { setQuery(e.target.value); setVisibleCount(9); }} placeholder={t.search}/><button onClick={() => document.querySelector("#products")?.scrollIntoView({behavior:"smooth"})}>{t.cta}</button></div><div className="market-toggle"><span>{t.country}</span><button className={market === "kg" ? "active" : ""} onClick={() => setMarket("kg")}>🇰🇬 {s.kgCountry}</button><button className={market === "uz" ? "active" : ""} onClick={() => setMarket("uz")}>🇺🇿 {s.uzCountry}</button></div></section>
+    <section className="search-band"><div className="search-box"><Icon name="search"/><input value={query} onChange={(e) => { setQuery(e.target.value); setVisibleCount(9); }} placeholder={t.search}/><button onClick={() => { void trackAnalytics("search_performed", { queryLength: query.trim().length, resultCount: filteredProducts.length, market }, { market }); document.querySelector("#products")?.scrollIntoView({behavior:"smooth"}); }}>{t.cta}</button></div><div className="market-toggle"><span>{t.country}</span><button className={market === "kg" ? "active" : ""} onClick={() => { if (market !== "kg") void trackAnalytics("market_changed", { market: "kg" }, { market: "kg" }); setMarket("kg"); }}>🇰🇬 {s.kgCountry}</button><button className={market === "uz" ? "active" : ""} onClick={() => { if (market !== "uz") void trackAnalytics("market_changed", { market: "uz" }, { market: "uz" }); setMarket("uz"); }}>🇺🇿 {s.uzCountry}</button></div></section>
 
     <div className="mobile-category-shell">
       <div className="mobile-category-filter" aria-label={t.categories}>
-        <button className={!selectedCategory ? "active" : ""} onClick={() => { setSelectedCategory(null); setVisibleCount(9); }}>{t.all}<b>{products.length}</b></button>
-        {categories.map(([icon, names]) => <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => { setSelectedCategory(icon); setVisibleCount(9); }}>{names[lang]}<b>{products.filter((product) => productCategories[product.kind] === icon).length}</b></button>)}
+        <button className={!selectedCategory ? "active" : ""} onClick={() => { setSelectedCategory(null); setVisibleCount(9); void trackAnalytics("category_selected", { category: "all", resultCount: products.length, market }, { market }); }}>{t.all}<b>{products.length}</b></button>
+        {categories.map(([icon, names]) => <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => { setSelectedCategory(icon); setVisibleCount(9); void trackAnalytics("category_selected", { category: icon, resultCount: products.filter((product) => productCategories[product.kind] === icon).length, market }, { market }); }}>{names[lang]}<b>{products.filter((product) => productCategories[product.kind] === icon).length}</b></button>)}
       </div>
     </div>
 
@@ -804,10 +814,10 @@ export default function Home() {
       <div className="section-title"><div><span>2026 · {s.trend}</span><h2>{activeCategory ? activeCategory[1][lang] : t.market}</h2><p>{t.marketSub}</p></div></div>
       <div className="catalog-layout">
       <aside className="category-panel" id="categories">
-        <div className="panel-heading"><strong>{t.categories}</strong><button onClick={() => { setSelectedCategory(null); setVisibleCount(9); }} aria-label={t.all}>☰</button></div>
+        <div className="panel-heading"><strong>{t.categories}</strong><button onClick={() => { setSelectedCategory(null); setVisibleCount(9); void trackAnalytics("category_selected", { category: "all", resultCount: products.length, market }, { market }); }} aria-label={t.all}>☰</button></div>
         <div className="category-list">{categories.map(([icon, names]) => {
           const count = products.filter((product) => productCategories[product.kind] === icon).length;
-          return <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => { setSelectedCategory((current) => current === icon ? null : icon); setVisibleCount(9); }} aria-pressed={selectedCategory === icon}>
+          return <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => { const next = selectedCategory === icon ? null : icon; setSelectedCategory(next); setVisibleCount(9); void trackAnalytics("category_selected", { category: next ?? "all", resultCount: next ? count : products.length, market }, { market }); }} aria-pressed={selectedCategory === icon}>
             <span className="category-icon"><Icon name={icon}/></span><span>{names[lang]}</span><b><em>{count}</em>›</b>
           </button>;
         })}</div>
@@ -817,9 +827,9 @@ export default function Home() {
         const isAdded = Boolean(quoteItems[product.kind]);
         const badge = productBadgeByKind.get(product.kind);
         return <article className={`product-card ${isAdded ? "in-quote" : ""}`} key={product.kind}>
-          <Link className="product-image" href={productHref(product.kind)} aria-label={`${detailLabel}: ${productLabel(product)}`}>{badge && <span className={`product-badge ${badge}`}>{productBadgeCopy[lang][badge]}</span>}<Image src={`${BASE_PATH}${product.image}`} alt={productLabel(product)} fill loading="lazy" sizes="(max-width: 760px) 50vw, (max-width: 1050px) 50vw, 33vw"/></Link>
+          <Link className="product-image" href={productHref(product.kind)} aria-label={`${detailLabel}: ${productLabel(product)}`} onClick={() => void trackAnalytics("product_card_click", { productKind: product.kind, target: "image", market }, { market })}>{badge && <span className={`product-badge ${badge}`}>{productBadgeCopy[lang][badge]}</span>}<Image src={`${BASE_PATH}${product.image}`} alt={productLabel(product)} fill loading="lazy" sizes="(max-width: 760px) 50vw, (max-width: 1050px) 50vw, 33vw"/></Link>
           <div className="product-info">
-            <h3><Link href={productHref(product.kind)}>{productLabel(product)}</Link></h3>
+            <h3><Link href={productHref(product.kind)} onClick={() => void trackAnalytics("product_card_click", { productKind: product.kind, target: "title", market }, { market })}>{productLabel(product)}</Link></h3>
             <div className="product-pricing">
               <div className="price-block purchase"><span>{t.chinaPrice}</span><strong>{formatUnitCurrency(priceNumber(product.cost), currency)}</strong></div>
               <div className="price-block retail"><span>{t.localPrice}</span><strong>{formatCurrency(retailInCny(product), currency)}</strong></div>
@@ -827,7 +837,7 @@ export default function Home() {
             <div className="product-meta"><span>{t.moq} {product.moq} {t.pieces}</span><span>{product.orders} {t.orders}</span></div>
             <div className="product-footer">
               <span><i/>{t.rail} → {market === "kg" ? s.kgCity : s.uzCity}</span>
-              <div><Link href={productHref(product.kind)}>{detailLabel} <b aria-hidden="true">→</b></Link><button className={isAdded ? "added" : ""} onClick={(event) => addToQuote(product, event.currentTarget.closest<HTMLElement>(".product-card"))} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button></div>
+              <div><Link href={productHref(product.kind)} onClick={() => void trackAnalytics("product_card_click", { productKind: product.kind, target: "details", market }, { market })}>{detailLabel} <b aria-hidden="true">→</b></Link><button className={isAdded ? "added" : ""} onClick={(event) => addToQuote(product, event.currentTarget.closest<HTMLElement>(".product-card"))} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button></div>
             </div>
           </div>
         </article>;
@@ -847,7 +857,7 @@ export default function Home() {
       </div>
       <div className="process-action">
         <div>{pc.facts.map((fact) => <span key={fact}><i/> {fact}</span>)}</div>
-        <button onClick={() => quoteCount > 0 ? setDrawerOpen(true) : document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" })}>{quoteCount > 0 ? pc.quote : pc.choose}<Icon name="arrow"/></button>
+        <button onClick={() => { if (quoteCount > 0) { void trackAnalytics("inquiry_opened", { target: "process", itemCount: quoteCount, market }, { market }); setDrawerOpen(true); } else document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" }); }}>{quoteCount > 0 ? pc.quote : pc.choose}<Icon name="arrow"/></button>
       </div>
     </section>
 
@@ -888,7 +898,7 @@ export default function Home() {
 
     <CustomerServiceDock lang={lang} onRequest={openCustomerService}/>
 
-    {quoteCount > 0 && <button className={`quote-tab ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen((open) => !open)} aria-label={`${iq.list}: ${quoteCount}`} title={`${iq.list}: ${quoteCount}`}>
+    {quoteCount > 0 && <button className={`quote-tab ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen((open) => { if (!open) void trackAnalytics("inquiry_opened", { target: "quote-tab", itemCount: quoteCount, market }, { market }); return !open; })} aria-label={`${iq.list}: ${quoteCount}`} title={`${iq.list}: ${quoteCount}`}>
       <Icon name="cart"/><span>{iq.list}</span><b>{quoteCount}</b>
     </button>}
 
@@ -920,7 +930,7 @@ export default function Home() {
           </section>
         </div>}
 
-      <form className="contact-form" onSubmit={submitInquiry}>
+      <form className="contact-form" onSubmit={submitInquiry} onFocusCapture={() => { if (!inquiryFormStarted.current) { inquiryFormStarted.current = true; void trackAnalytics("inquiry_started", { itemCount: quoteCount, market }, { market }); } }} onInvalidCapture={(event) => { const field = (event.target as HTMLInputElement).name || (event.target as HTMLInputElement).type || "unknown"; void trackAnalytics("inquiry_validation_error", { field, itemCount: quoteCount, market }, { market }); }}>
           <label className="form-honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off"/></label>
           <label className="field full"><span>{iq.destination}</span><select name="destination" defaultValue={destinationOptions[0]}>{destinationOptions.map((city) => <option key={city}>{city}</option>)}</select></label>
           <label className="field full"><span>{iq.phone} *</span><div className="phone-field"><select name="phoneCountryCode" key={market} defaultValue={market === "kg" ? "+996" : "+998"}><option>+996</option><option>+998</option><option>+7</option><option>+86</option></select><input name="phone" type="tel" inputMode="tel" autoComplete="tel" required placeholder="000 000 000"/></div></label>

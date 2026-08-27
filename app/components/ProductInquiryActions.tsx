@@ -6,7 +6,7 @@ import { BASE_PATH } from "../base-path";
 import { buildPhoneHref, buildWhatsappHref, customerServiceCopy, type ContactMethod, type SiteLanguage } from "../customer-service";
 import { formatUnitCurrency, type Currency } from "../currency";
 import CustomerServiceDock from "./CustomerServiceDock";
-import { getClientContext } from "../lib/analytics-client";
+import { getClientContext, trackAnalytics } from "../lib/analytics-client";
 
 type Props = {
   lang: SiteLanguage;
@@ -70,11 +70,13 @@ export default function ProductInquiryActions({ lang, product, currency }: Props
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const idempotencyKey = useRef("");
+  const formStarted = useRef(false);
   const message = `${service.manager}: ${product.name} × ${quantity}`;
   const whatsappHref = buildWhatsappHref(message);
   const phoneHref = buildPhoneHref();
 
   const openInquiry = (method: ContactMethod = "phone") => {
+    void trackAnalytics("inquiry_opened", { method, productKind: product.kind, itemCount: 1 });
     setPreferred(method);
     setSubmitted(false);
     setOpen(true);
@@ -123,10 +125,10 @@ export default function ProductInquiryActions({ lang, product, currency }: Props
     <div className="detail-action-group">
       <button className="detail-add-inquiry" type="button" onClick={() => openInquiry()} aria-controls="product-inquiry-drawer"><CartIcon/>{text.add}</button>
       {whatsappHref
-        ? <a className="detail-whatsapp" href={whatsappHref} target="_blank" rel="noreferrer"><WhatsappIcon/>{text.whatsapp}</a>
+        ? <a className="detail-whatsapp" href={whatsappHref} target="_blank" rel="noreferrer" onClick={() => void trackAnalytics("contact_clicked", { method: "whatsapp", target: "product-detail", productKind: product.kind })}><WhatsappIcon/>{text.whatsapp}</a>
         : <button className="detail-whatsapp" type="button" onClick={() => openInquiry("whatsapp")}><WhatsappIcon/>{text.whatsapp}</button>}
       {phoneHref
-        ? <a className="detail-phone-link" href={phoneHref}>{text.phone}</a>
+        ? <a className="detail-phone-link" href={phoneHref} onClick={() => void trackAnalytics("contact_clicked", { method: "phone", target: "product-detail", productKind: product.kind })}>{text.phone}</a>
         : <button className="detail-phone-link" type="button" onClick={() => openInquiry("phone")}>{text.phone}</button>}
     </div>
 
@@ -149,7 +151,7 @@ export default function ProductInquiryActions({ lang, product, currency }: Props
           <div className="inquiry-product-side"><strong>{formatUnitCurrency(product.costCny * quantity, currency)}</strong></div>
         </article>
       </div>
-      <form className="contact-form" onSubmit={submit}>
+      <form className="contact-form" onSubmit={submit} onFocusCapture={() => { if (!formStarted.current) { formStarted.current = true; void trackAnalytics("inquiry_started", { productKind: product.kind, itemCount: 1 }); } }} onInvalidCapture={(event) => { const field = (event.target as HTMLInputElement).name || (event.target as HTMLInputElement).type || "unknown"; void trackAnalytics("inquiry_validation_error", { field, productKind: product.kind }); }}>
         <label className="form-honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off"/></label>
         <label className="field full"><span>{text.destination}</span><select name="destination" defaultValue={text.cities[0]}>{text.cities.map((city) => <option key={city}>{city}</option>)}</select></label>
         <label className="field full"><span>{text.phoneLabel} *</span><div className="phone-field"><select name="phoneCountryCode" defaultValue={lang === "uz" ? "+998" : "+996"}><option>+996</option><option>+998</option><option>+7</option><option>+86</option></select><input name="phone" type="tel" inputMode="tel" autoComplete="tel" required placeholder="000 000 000"/></div></label>

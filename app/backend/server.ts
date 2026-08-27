@@ -1,5 +1,7 @@
 import {
   inquiryStatuses,
+  type AnalyticsEventName,
+  type AnalyticsProperties,
   type AdminSnapshot,
   type InquiryItem,
   type InquiryRecord,
@@ -23,7 +25,7 @@ type RuntimeEnv = {
 
 type AnalyticsEvent = {
   id: string;
-  name: "page_view" | "inquiry_submitted";
+  name: AnalyticsEventName;
   visitorId: string;
   sessionId: string;
   path: string;
@@ -33,7 +35,10 @@ type AnalyticsEvent = {
   utmMedium: string;
   utmCampaign: string;
   language: string;
+  currency: string;
+  market: string;
   deviceType: string;
+  properties: AnalyticsProperties;
   createdAt: string;
 };
 
@@ -163,7 +168,10 @@ function eventToRow(event: AnalyticsEvent) {
     utm_medium: event.utmMedium,
     utm_campaign: event.utmCampaign,
     language: event.language,
+    currency: event.currency,
+    market: event.market,
     device_type: event.deviceType,
+    properties: event.properties,
     created_at: event.createdAt,
   };
 }
@@ -233,7 +241,7 @@ export async function createInquiry(input: CreateInquiryInput, idempotencyKey: s
       id: newId("evt"), name: "inquiry_submitted", visitorId: inquiry.visitorId, sessionId: inquiry.sessionId,
       path: inquiry.sourcePath, source: inquiry.source, referrer: inquiry.referrer, utmSource: inquiry.utmSource,
       utmMedium: inquiry.utmMedium, utmCampaign: inquiry.utmCampaign, language: inquiry.language,
-      deviceType: "unknown", createdAt: now,
+      currency: inquiry.currency, market: inquiry.market, deviceType: "unknown", properties: { itemCount: inquiry.items.length }, createdAt: now,
     });
     return { inquiry, created: true };
   }
@@ -252,7 +260,8 @@ export async function createInquiry(input: CreateInquiryInput, idempotencyKey: s
     await recordAnalytics({
       name: "inquiry_submitted", visitorId: createdInquiry.visitorId, sessionId: createdInquiry.sessionId, path: createdInquiry.sourcePath,
       referrer: createdInquiry.referrer, utmSource: createdInquiry.utmSource, utmMedium: createdInquiry.utmMedium,
-      utmCampaign: createdInquiry.utmCampaign, language: createdInquiry.language, deviceType: "unknown",
+      utmCampaign: createdInquiry.utmCampaign, language: createdInquiry.language, currency: createdInquiry.currency,
+      market: createdInquiry.market, deviceType: "unknown", properties: { itemCount: createdInquiry.items.length },
     });
   } catch (error) {
     logError("inquiry.conversion-event", error, { inquiryId: createdInquiry.id });
@@ -366,6 +375,7 @@ function memorySnapshot(days: number, status: InquiryStatus | "all", search: str
   const visitors = new Set(views.map((entry) => entry.visitorId).filter(Boolean)).size;
   const sessions = new Set(views.map((entry) => entry.sessionId).filter(Boolean)).size;
   const visitorIds = new Set(views.map((entry) => entry.visitorId).filter(Boolean));
+  const identifiedViews = views.filter((entry) => entry.visitorId).length;
   const inquiryVisitors = new Set(inquiriesInPeriod.map((entry) => entry.visitorId).filter((id) => id && visitorIds.has(id))).size;
   const trend = emptyBusinessDates(days);
   const trendMap = new Map(trend.map((point) => [point.date, point]));
@@ -386,6 +396,8 @@ function memorySnapshot(days: number, status: InquiryStatus | "all", search: str
   }
   const needle = search.toLowerCase();
   const filtered = store.inquiries.filter((entry) => (status === "all" || entry.status === status) && (!needle || `${entry.phone} ${entry.email} ${entry.destination} ${entry.id}`.toLowerCase().includes(needle)));
+  const funnel: Partial<Record<AnalyticsEventName, number>> = {};
+  for (const event of events) funnel[event.name] = (funnel[event.name] ?? 0) + 1;
   return {
     periodDays: days,
     metrics: {
@@ -394,6 +406,12 @@ function memorySnapshot(days: number, status: InquiryStatus | "all", search: str
       validInquiryRate: inquiriesInPeriod.length ? inquiriesInPeriod.filter((entry) => entry.status !== "invalid").length / inquiriesInPeriod.length * 100 : 0,
     },
     trend, sources: rankedFromMemory(events, inquiriesInPeriod, "source"), pages: rankedFromMemory(events, inquiriesInPeriod, "path"),
+    tracking: {
+      eventCount: events.length,
+      identifiedViewRate: views.length ? identifiedViews / views.length * 100 : 0,
+      lastEventAt: events.reduce((latest, event) => event.createdAt > latest ? event.createdAt : latest, ""),
+      funnel,
+    },
     inquiries: filtered.slice((page - 1) * pageSize, page * pageSize),
     totalInquiries: filtered.length,
     inquiryPage: { page, pageSize, totalPages: Math.max(1, Math.ceil(filtered.length / pageSize)) },
@@ -417,6 +435,10 @@ function rankRows(rows: Array<Record<string, unknown>>): RankedMetric[] {
   return rows.map((row) => ({ label: String(row.label || "—"), pageViews: Number(row.page_views ?? 0), inquiries: Number(row.inquiries ?? 0) }));
 }
 
+function funnelRows(rows: Array<Record<string, unknown>>) {
+  return Object.fromEntries(rows.map((row) => [String(row.event_name), Number(row.event_count ?? 0)]));
+}
+
 export async function getAdminSnapshot(days: number, status: InquiryStatus | "all", search: string, requestedPage = 1, requestedPageSize = 50): Promise<AdminSnapshot> {
   const periodDays = [7, 30, 90].includes(days) ? days : 30;
   const page = Math.max(1, Math.min(10_000, Math.floor(requestedPage) || 1));
@@ -424,11 +446,13 @@ export async function getAdminSnapshot(days: number, status: InquiryStatus | "al
   if (!supabaseConfig()) return memorySnapshot(periodDays, status, search, page, pageSize);
   const since = periodStart(periodDays);
   const rpcBody = JSON.stringify({ p_since: since.toISOString() });
-  const [metricRows, trendRows, sourceRows, pageRows] = await Promise.all([
+  const [metricRows, trendRows, sourceRows, pageRows, trackingRows, funnelMetricRows] = await Promise.all([
     supabaseRows<Record<string, unknown>>("rpc/admin_metrics", { method: "POST", body: rpcBody }),
     supabaseRows<Record<string, unknown>>("rpc/admin_trend", { method: "POST", body: rpcBody }),
     supabaseRows<Record<string, unknown>>("rpc/admin_rank_sources", { method: "POST", body: rpcBody }),
     supabaseRows<Record<string, unknown>>("rpc/admin_rank_pages", { method: "POST", body: rpcBody }),
+    supabaseRows<Record<string, unknown>>("rpc/admin_tracking_health", { method: "POST", body: rpcBody }),
+    supabaseRows<Record<string, unknown>>("rpc/admin_event_funnel", { method: "POST", body: rpcBody }),
   ]);
 
   const parameters = new URLSearchParams({ select: "*", order: "created_at.desc", limit: String(pageSize), offset: String((page - 1) * pageSize) });
@@ -446,10 +470,19 @@ export async function getAdminSnapshot(days: number, status: InquiryStatus | "al
   const inquiries = Number(metrics.inquiries ?? 0);
   const inquiryVisitors = Number(metrics.inquiry_visitors ?? 0);
   const validInquiries = Number(metrics.valid_inquiries ?? 0);
+  const tracking = trackingRows[0] ?? {};
+  const trackedViews = Number(tracking.page_views ?? 0);
+  const identifiedViews = Number(tracking.identified_views ?? 0);
   return {
     periodDays,
     metrics: { pageViews, visitors, sessions, inquiries, inquiryVisitors, conversionRate: visitors ? inquiryVisitors / visitors * 100 : 0, validInquiryRate: inquiries ? validInquiries / inquiries * 100 : 0 },
     trend: mergeTrend(periodDays, trendRows), sources: rankRows(sourceRows), pages: rankRows(pageRows),
+    tracking: {
+      eventCount: Number(tracking.event_count ?? 0),
+      identifiedViewRate: trackedViews ? identifiedViews / trackedViews * 100 : 0,
+      lastEventAt: String(tracking.last_event_at ?? ""),
+      funnel: funnelRows(funnelMetricRows),
+    },
     inquiries: inquiryRows.map(rowToInquiry), totalInquiries,
     inquiryPage: { page, pageSize, totalPages: Math.max(1, Math.ceil(totalInquiries / pageSize)) },
   };
