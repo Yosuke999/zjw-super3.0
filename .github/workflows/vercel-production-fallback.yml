@@ -1,0 +1,141 @@
+name: Vercel production fallback
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  deployments: read
+
+concurrency:
+  group: vercel-production-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ensure-production-deployment:
+    name: Ensure Vercel Production deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+
+    steps:
+      - name: Wait for Vercel Git deployment
+        id: automatic
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          production_state() {
+            local deployments deployment_id statuses_url
+            deployments="$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "/repos/${GITHUB_REPOSITORY}/deployments?sha=${GITHUB_SHA}&environment=Production&per_page=20")"
+
+            deployment_id="$(jq -r \
+              '[.[] | select(.environment == "Production")] | sort_by(.created_at) | last | .id // empty' \
+              <<<"${deployments}")"
+
+            if [[ -z "${deployment_id}" ]]; then
+              printf '%s\n' "missing"
+              return
+            fi
+
+            statuses_url="/repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses?per_page=1"
+            gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "${statuses_url}" \
+              --jq '.[0].state // "pending"'
+          }
+
+          for attempt in {1..18}; do
+            state="$(production_state)"
+            echo "Automatic deployment check ${attempt}/18: ${state}"
+            if [[ "${state}" == "success" ]]; then
+              echo "Vercel Production already succeeded; Deploy Hook is not needed."
+              echo "ready=true" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "No successful Production deployment appeared within 3 minutes."
+          echo "ready=false" >> "${GITHUB_OUTPUT}"
+
+      - name: Trigger Deploy Hook
+        if: steps.automatic.outputs.ready != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${VERCEL_DEPLOY_HOOK_URL}" ]]; then
+            echo "GitHub Secret VERCEL_DEPLOY_HOOK_URL is not configured."
+            exit 1
+          fi
+
+          http_code="$(curl \
+            --silent \
+            --show-error \
+            --output "${RUNNER_TEMP}/vercel-deploy-hook-response.json" \
+            --write-out '%{http_code}' \
+            --request POST \
+            "${VERCEL_DEPLOY_HOOK_URL}")"
+
+          if [[ "${http_code}" -lt 200 || "${http_code}" -ge 300 ]]; then
+            echo "Vercel Deploy Hook returned HTTP ${http_code}."
+            exit 1
+          fi
+
+          echo "Deploy Hook accepted the fallback deployment (HTTP ${http_code})."
+
+      - name: Verify fallback Production deployment
+        if: steps.automatic.outputs.ready != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          production_state() {
+            local deployments deployment_id statuses_url
+            deployments="$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "/repos/${GITHUB_REPOSITORY}/deployments?sha=${GITHUB_SHA}&environment=Production&per_page=20")"
+
+            deployment_id="$(jq -r \
+              '[.[] | select(.environment == "Production")] | sort_by(.created_at) | last | .id // empty' \
+              <<<"${deployments}")"
+
+            if [[ -z "${deployment_id}" ]]; then
+              printf '%s\n' "missing"
+              return
+            fi
+
+            statuses_url="/repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses?per_page=1"
+            gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "${statuses_url}" \
+              --jq '.[0].state // "pending"'
+          }
+
+          for attempt in {1..36}; do
+            state="$(production_state)"
+            echo "Fallback deployment check ${attempt}/36: ${state}"
+            if [[ "${state}" == "success" ]]; then
+              echo "Fallback Vercel Production deployment succeeded."
+              exit 0
+            fi
+            if [[ "${state}" == "failure" || "${state}" == "error" ]]; then
+              echo "Fallback Vercel Production deployment failed with state: ${state}."
+              exit 1
+            fi
+            sleep 10
+          done
+
+          echo "Timed out waiting for the fallback Vercel Production deployment."
+          exit 1
