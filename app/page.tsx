@@ -1,12 +1,80 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { BASE_PATH } from "./base-path";
+import { catalogProducts, type ProductBadge } from "./catalog";
+import { buildProductHref, currencyOptions, formatCurrency, formatExchangeRate, formatUnitCurrency, supportedCurrencies, type Currency } from "./currency";
+import { kyrgyzProductNames } from "./product-localization";
+import CustomerServiceDock from "./components/CustomerServiceDock";
+import { customerServiceCopy, type ContactMethod } from "./customer-service";
+import { getClientContext } from "./lib/analytics-client";
 
 type Lang = "ru" | "ky" | "uz" | "zh";
-type Currency = "CNY" | "KGS" | "UZS" | "RUB";
 type CategoryId = "home" | "fashion" | "tools" | "digital" | "auto" | "beauty";
 type LogoVariant = 1 | 2 | 3 | 4 | 5 | 6;
+
+const preferenceStorageKey = "central-asia-trade.preferences";
+const supportedLanguages: Lang[] = ["ru", "ky", "uz", "zh"];
+type Preferences = { lang: Lang; currency: Currency };
+
+const defaultPreferences: Preferences = { lang: "ru", currency: "KGS" };
+const preferenceSubscribers = new Set<() => void>();
+let currentPreferences = defaultPreferences;
+let cachedStoredPreferences: string | null | undefined;
+
+function parseStoredPreferences(raw: string | null): Preferences {
+  if (!raw) return defaultPreferences;
+  try {
+    const parsed = JSON.parse(raw) as { lang?: string; currency?: string };
+    return {
+      lang: supportedLanguages.includes(parsed.lang as Lang) ? parsed.lang as Lang : defaultPreferences.lang,
+      currency: supportedCurrencies.includes(parsed.currency as Currency) ? parsed.currency as Currency : defaultPreferences.currency,
+    };
+  } catch {
+    return defaultPreferences;
+  }
+}
+
+function getPreferencesSnapshot() {
+  if (typeof window === "undefined") return defaultPreferences;
+  try {
+    const stored = window.localStorage.getItem(preferenceStorageKey);
+    if (stored !== cachedStoredPreferences) {
+      cachedStoredPreferences = stored;
+      currentPreferences = parseStoredPreferences(stored);
+    }
+  } catch {
+    // Keep the in-memory preference when browser storage is unavailable.
+  }
+  return currentPreferences;
+}
+
+function subscribeToPreferences(callback: () => void) {
+  preferenceSubscribers.add(callback);
+  const syncFromAnotherTab = (event: StorageEvent) => {
+    if (event.key !== preferenceStorageKey) return;
+    cachedStoredPreferences = undefined;
+    callback();
+  };
+  window.addEventListener("storage", syncFromAnotherTab);
+  return () => {
+    preferenceSubscribers.delete(callback);
+    window.removeEventListener("storage", syncFromAnotherTab);
+  };
+}
+
+function savePreferences(preferences: Preferences) {
+  currentPreferences = preferences;
+  cachedStoredPreferences = JSON.stringify(preferences);
+  try {
+    window.localStorage.setItem(preferenceStorageKey, cachedStoredPreferences);
+  } catch {
+    // The preference still works for the current page when storage is blocked.
+  }
+  preferenceSubscribers.forEach((notifyPreferenceChange) => notifyPreferenceChange());
+}
 
 const logoOptions: Array<{ id: LogoVariant; name: string; idea: string; fit: string; file: string }> = [
   { id: 1, name: "丝路门廊", idea: "门廊与铁路合一，延续第一版最完整的丝路文化记忆。", fit: "综合推荐 · 品牌官网", file: "logo-01-silk-gate" },
@@ -72,7 +140,9 @@ const inquiryCopy = {
     preferred: "Предпочтительный способ связи", phoneFirst: "Телефон", whatsappFirst: "WhatsApp", emailFirst: "Почта", note: "Комментарий",
     notePlaceholder: "Нужные модели, цвета, сроки или другие пожелания", submit: "Отправить запрос и ждать звонка",
     response: "В рабочее время свяжемся с вами в течение 30 минут.", free: "Бесплатный расчёт · без обязательства заказывать",
-    success: "Запрос подготовлен. Мы свяжемся с вами по телефону.", close: "Закрыть", exchange: "Ориентировочный пересчёт",
+    success: "Запрос отправлен. Мы свяжемся с вами по телефону.", close: "Закрыть", exchange: "Ориентировочный курс",
+    subtotal: "Стоимость товаров", rate: "Курс пересчёта", excluded: "Не включено в сумму",
+    excludedDetail: "Доставка, налоги и сервисный сбор будут указаны после ручного расчёта.",
   },
   ky: {
     add: "Сурамга кошуу", added: "Кошулду", list: "Сурам", title: "Жеткирүү менен так бааны алыңыз",
@@ -82,7 +152,9 @@ const inquiryCopy = {
     preferred: "Байланыштын ыңгайлуу жолу", phoneFirst: "Телефон", whatsappFirst: "WhatsApp", emailFirst: "Электрондук дарек", note: "Кошумча маалымат",
     notePlaceholder: "Модель, түс, мөөнөт же башка каалоолор", submit: "Сурам жөнөтүп, чалууну күтүү",
     response: "Иш убактысында 30 мүнөттүн ичинде байланышабыз.", free: "Акысыз эсеп · сатып алуу милдеттүү эмес",
-    success: "Сурам даяр. Биз сизге телефон аркылуу байланышабыз.", close: "Жабуу", exchange: "Болжолдуу курс",
+    success: "Сурам жөнөтүлдү. Биз сизге телефон аркылуу байланышабыз.", close: "Жабуу", exchange: "Болжолдуу курс",
+    subtotal: "Товардын суммасы", rate: "Эсептөө курсу", excluded: "Суммага кирген жок",
+    excludedDetail: "Жеткирүү, салыктар жана тейлөө акысы кол менен эсептелгенден кийин көрсөтүлөт.",
   },
   uz: {
     add: "So‘rovga qo‘shish", added: "Qo‘shildi", list: "So‘rov", title: "Yetkazib berish bilan aniq narxni oling",
@@ -92,7 +164,9 @@ const inquiryCopy = {
     preferred: "Afzal aloqa usuli", phoneFirst: "Telefon", whatsappFirst: "WhatsApp", emailFirst: "E-pochta", note: "Izoh",
     notePlaceholder: "Model, rang, muddat yoki boshqa istaklar", submit: "So‘rov yuborish va qo‘ng‘iroqni kutish",
     response: "Ish vaqtida 30 daqiqa ichida bog‘lanamiz.", free: "Bepul hisob-kitob · buyurtma majburiy emas",
-    success: "So‘rov tayyor. Siz bilan telefon orqali bog‘lanamiz.", close: "Yopish", exchange: "Taxminiy kurs",
+    success: "So‘rov yuborildi. Siz bilan telefon orqali bog‘lanamiz.", close: "Yopish", exchange: "Taxminiy kurs",
+    subtotal: "Mahsulotlar summasi", rate: "Hisoblash kursi", excluded: "Summaga kiritilmagan",
+    excludedDetail: "Yetkazish, soliqlar va xizmat haqi qo‘lda hisoblangandan keyin ko‘rsatiladi.",
   },
   zh: {
     add: "加入询价单", added: "已加入", list: "询价单", title: "获取准确到货价",
@@ -102,7 +176,9 @@ const inquiryCopy = {
     preferred: "优先联系方式", phoneFirst: "电话优先", whatsappFirst: "WhatsApp", emailFirst: "邮箱", note: "备注",
     notePlaceholder: "需要的型号、颜色、交期或其他要求", submit: "提交询价，等待电话联系",
     response: "工作时间内，我们将在 30 分钟内与您联系。", free: "免费报价 · 不产生订购义务",
-    success: "询价信息已准备，我们会优先通过电话与您联系。", close: "关闭", exchange: "参考汇率换算",
+    success: "询价已提交，我们会优先通过电话与您联系。", close: "关闭", exchange: "参考汇率换算",
+    subtotal: "商品小计", rate: "参考汇率", excluded: "暂未计入",
+    excludedDetail: "物流、税费及服务费将在人工核价后单独列明。",
   },
 } as const;
 
@@ -132,6 +208,184 @@ const siteCopy = {
     save: "收藏商品", logisticsNotice: "物流测算将在下一步采购流程中开放。", languageLabel: "语言", currencyLabel: "货币", navLabel: "主导航",
   },
 } as const;
+
+const productBadgeCopy: Record<Lang, Record<ProductBadge, string>> = {
+  ru: { hot: "ХИТ", "low-moq": "МАЛАЯ ПАРТИЯ" },
+  ky: { hot: "СУРОО-ТАЛАПТА", "low-moq": "АЗ ПАРТИЯ" },
+  uz: { hot: "OMMABOP", "low-moq": "KAM PARTIYA" },
+  zh: { hot: "热销", "low-moq": "低起订量" },
+};
+
+const heroComparisonCopy = {
+  ru: {
+    label: "Сравнение цен сегодня", source: "Закупка в Китае", local: "Розница", gap: "Разница в цене",
+    disclaimer: "Без доставки и других расходов. Итоговая цена — после расчёта.", verified: "Цена поставщика проверена", reference: "Рыночная цена — ориентир",
+    show: "Показать товар", carousel: "Сравнение цен на популярные товары",
+  },
+  ky: {
+    label: "Бүгүнкү бааларды салыштыруу", source: "Кытайдагы сатып алуу", local: "Жергиликтүү чекене баа", gap: "Баалардын айырмасы",
+    disclaimer: "Жеткирүү жана башка чыгымдар кирбейт. Акыркы баа эсептен кийин аныкталат.", verified: "Жеткирүүчүнүн баасы текшерилди", reference: "Базар баасы — маалымат үчүн",
+    show: "Өнүмдү көрсөтүү", carousel: "Популярдуу өнүмдөрдүн бааларын салыштыруу",
+  },
+  uz: {
+    label: "Bugungi narxlar taqqoslanishi", source: "Xitoydagi xarid", local: "Mahalliy chakana narx", gap: "Narxlar farqi",
+    disclaimer: "Yetkazish va boshqa xarajatlar kiritilmagan. Yakuniy narx hisob-kitobdan keyin aniqlanadi.", verified: "Yetkazib beruvchi narxi tekshirildi", reference: "Bozor narxi — ma’lumot uchun",
+    show: "Mahsulotni ko‘rsatish", carousel: "Ommabop mahsulotlar narxlarini taqqoslash",
+  },
+  zh: {
+    label: "今日价格对比", source: "中国进货参考价", local: "当地零售参考价", gap: "单件理论价差",
+    disclaimer: "未包含运输及其他费用，以最终报价为准。", verified: "中国供应商价格已核对", reference: "当地市场价格仅作参考",
+    show: "显示商品", carousel: "热销商品价格对比",
+  },
+} as const;
+
+const newsCopy = {
+  ru: {
+    eyebrow: "ТРАНСПОРТНАЯ СВОДКА", title: "Железная дорога и логистика", verified: "Только официальные источники",
+    source: "Первоисточник", photo: "Документальное фото", open: "Открыть материал", close: "Закрыть материал", detail: "Подробности",
+  },
+  ky: {
+    eyebrow: "ТРАНСПОРТ КАБАРЛАРЫ", title: "Темир жол жана логистика", verified: "Расмий булактар гана",
+    source: "Баштапкы булак", photo: "Чыныгы сүрөт", open: "Материалды ачуу", close: "Материалды жабуу", detail: "Толук маалымат",
+  },
+  uz: {
+    eyebrow: "TRANSPORT DAYJESTI", title: "Temir yo‘l va logistika", verified: "Faqat rasmiy manbalar",
+    source: "Asl manba", photo: "Haqiqiy surat", open: "Maqolani ochish", close: "Maqolani yopish", detail: "Batafsil",
+  },
+  zh: {
+    eyebrow: "运输简报", title: "铁路与物流动态", verified: "仅采用官方信息源",
+    source: "原始来源", photo: "真实资料图", open: "查看官方原文", close: "关闭详情", detail: "详细信息",
+  },
+} as const;
+
+const logisticsNews = [
+  {
+    id: "border-logistics", date: "2026-07-30", image: "/news/torugart-crossing.jpg",
+    sourceUrl: "https://gov.uz/ru/minenergy/news/view/200002",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:Torugartcrossing.jpg",
+    tag: { ru: "ГРАНИЦА", ky: "ЧЕК АРА", uz: "CHEGARA", zh: "口岸" },
+    title: {
+      ru: "Узбекистан и Кыргызстан усилят инфраструктуру вдоль железной дороги",
+      ky: "Өзбекстан менен Кыргызстан темир жол боюндагы инфраструктураны күчөтөт",
+      uz: "O‘zbekiston va Qirg‘iziston temir yo‘l bo‘yi infratuzilmasini rivojlantiradi",
+      zh: "乌吉将推进铁路沿线口岸与商贸物流设施",
+    },
+    summary: {
+      ru: "Стороны договорились развивать пограничную и торгово-логистическую инфраструктуру, цифровизировать разрешительные процедуры и улучшать условия для автоперевозчиков.",
+      ky: "Тараптар чек ара жана соода-логистикалык инфраструктураны өнүктүрүү, уруксат берүү жол-жоболорун санариптештирүү жана автоташуучулар үчүн шарттарды жакшыртуу боюнча макулдашты.",
+      uz: "Tomonlar chegara va savdo-logistika infratuzilmasini rivojlantirish, ruxsat berish jarayonlarini raqamlashtirish va avtomobil tashuvchilari uchun sharoitlarni yaxshilashga kelishdi.",
+      zh: "双方同意发展铁路沿线口岸和商贸物流基础设施，推动许可手续数字化，并改善公路承运人的通行条件。",
+    },
+    sourceName: { ru: "Правительственный портал Узбекистана", ky: "Өзбекстан Өкмөтүнүн порталы", uz: "O‘zbekiston Hukumat portali", zh: "乌兹别克斯坦政府门户网站" },
+    photoCaption: { ru: "Погранпереход Торугарт, Кыргызстан — Китай", ky: "Торугарт чек ара өткөрмө пункту, Кыргызстан — Кытай", uz: "Torugart chegara o‘tish punkti, Qirg‘iziston — Xitoy", zh: "吐尔尕特中吉边境口岸实景" },
+    photoCredit: { ru: "Alexdejoyeuse · общественное достояние / Wikimedia Commons", ky: "Alexdejoyeuse · коомдук домен / Wikimedia Commons", uz: "Alexdejoyeuse · jamoat mulki / Wikimedia Commons", zh: "Alexdejoyeuse · 公有领域 / Wikimedia Commons" },
+  },
+  {
+    id: "railway-schedule", date: "2026-07-15", image: "/news/balykchy-aerial.jpg",
+    sourceUrl: "https://gov.uz/ru/mintrans/news/view/193833",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:%D0%91%D0%B0%D0%BB%D1%8B%D0%BA%D1%87%D1%8B,_%D1%81%D1%82%D0%B0%D0%BD%D1%86%D0%B8%D1%8F_%D1%81%D0%B2%D0%B5%D1%80%D1%85%D1%83_(1).jpg",
+    tag: { ru: "СТРОЙКА", ky: "КУРУЛУШ", uz: "QURILISH", zh: "建设" },
+    title: {
+      ru: "Работы на железной дороге Китай — Кыргызстан — Узбекистан идут по графику",
+      ky: "Кытай — Кыргызстан — Өзбекстан темир жолунун курулушу график боюнча жүрүүдө",
+      uz: "Xitoy — Qirg‘iziston — O‘zbekiston temir yo‘li ishlari jadval bo‘yicha ketmoqda",
+      zh: "中吉乌铁路建设按既定计划推进",
+    },
+    summary: {
+      ru: "На встрече транспортных ведомств подтверждено соблюдение графика. Также обсуждались мультимодальный коридор и возможность экспортного статуса для пограничной станции Кашгар.",
+      ky: "Транспорт мекемелеринин жолугушуусунда курулуш графиги сакталганы белгиленди. Көп түрдүү ташуу коридору жана Кашгар чек ара станциясына экспорттук макам берүү да талкууланды.",
+      uz: "Transport idoralari uchrashuvida qurilish jadvaliga rioya qilinayotgani qayd etildi. Multimodal yo‘lak va Qashg‘ar chegara stansiyasiga eksport maqomi berish masalasi ham muhokama qilindi.",
+      zh: "交通部门会谈确认工程按计划推进，同时讨论提升中吉乌多式联运通道吸引力，以及研究赋予喀什边境站“出口站”地位。",
+    },
+    sourceName: { ru: "Министерство транспорта Узбекистана", ky: "Өзбекстандын Транспорт министрлиги", uz: "O‘zbekiston Transport vazirligi", zh: "乌兹别克斯坦交通部" },
+    photoCaption: { ru: "Железнодорожная станция Балыкчы, Кыргызстан", ky: "Балыкчы темир жол станциясы, Кыргызстан", uz: "Baliqchi temir yo‘l stansiyasi, Qirg‘iziston", zh: "吉尔吉斯斯坦巴雷克奇铁路站实景" },
+    photoCredit: { ru: "Nikolai Bulykin · лицензия CC BY-SA 4.0 / Wikimedia Commons", ky: "Nikolai Bulykin · CC BY-SA 4.0 лицензиясы / Wikimedia Commons", uz: "Nikolai Bulykin · CC BY-SA 4.0 litsenziyasi / Wikimedia Commons", zh: "Nikolai Bulykin · CC BY-SA 4.0 授权 / Wikimedia Commons" },
+  },
+  {
+    id: "south-transit", date: "2026-07-07", image: "/news/uzbekistan-freight-train.jpg",
+    sourceUrl: "https://gov.uz/ru/mintrans/news/view/189129",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:OTY_2O%27Z_UY_Tangimush_-_Pulhokim.jpg",
+    tag: { ru: "ГРУЗЫ", ky: "ЖҮК", uz: "YUK", zh: "货运" },
+    title: {
+      ru: "Южный транзит через Узбекистан вырос на 23%",
+      ky: "Өзбекстан аркылуу түштүк транзити 23% өстү",
+      uz: "O‘zbekiston orqali janubiy tranzit 23 foizga oshdi",
+      zh: "乌兹别克斯坦南向过境货运增长 23%",
+    },
+    summary: {
+      ru: "В первом квартале 2026 года южный транзит достиг 1,8 млн тонн: 1,3 млн тонн перевезено по железной дороге и 0,5 млн тонн автотранспортом.",
+      ky: "2026-жылдын биринчи чейрегинде түштүк багытындагы транзит 1,8 млн тоннага жетти: 1,3 млн тоннасы темир жол, 0,5 млн тоннасы автоунаа менен ташылды.",
+      uz: "2026-yil birinchi choragida janubiy tranzit 1,8 mln tonnaga yetdi: 1,3 mln tonna temir yo‘l, 0,5 mln tonna avtomobil transporti hissasiga to‘g‘ri keldi.",
+      zh: "2026 年第一季度南向过境货运达到 180 万吨，其中铁路 130 万吨、公路 50 万吨。",
+    },
+    sourceName: { ru: "Министерство транспорта Узбекистана", ky: "Өзбекстандын Транспорт министрлиги", uz: "O‘zbekiston Transport vazirligi", zh: "乌兹别克斯坦交通部" },
+    photoCaption: { ru: "Грузовой поезд между Тангимушем и Пулхокимом, Узбекистан", ky: "Өзбекстандагы Тангимуш — Пулхоким жүк поезди", uz: "Tangimush va Pulhokim oralig‘idagi yuk poyezdi, O‘zbekiston", zh: "乌兹别克斯坦唐吉穆什—普尔霍基姆区间货运列车" },
+    photoCredit: { ru: "Kabelleger · лицензия CC BY-SA 4.0 / Wikimedia Commons", ky: "Kabelleger · CC BY-SA 4.0 лицензиясы / Wikimedia Commons", uz: "Kabelleger · CC BY-SA 4.0 litsenziyasi / Wikimedia Commons", zh: "Kabelleger · CC BY-SA 4.0 授权 / Wikimedia Commons" },
+  },
+  {
+    id: "e-logistics", date: "2026-06-24", image: "/news/kant-station.jpg",
+    sourceUrl: "https://gov.uz/en/imv/news/view/183443",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:Kant_near_Bishkek_03-2016_img03_railway_station.jpg",
+    tag: { ru: "ЦИФРОВОЕ", ky: "САНАРИП", uz: "RAQAMLI", zh: "数字化" },
+    title: {
+      ru: "Узбекистан готовит единую платформу E-Logistics",
+      ky: "Өзбекстан бирдиктүү E-Logistics платформасын даярдоодо",
+      uz: "O‘zbekiston yagona E-Logistics platformasini tayyorlamoqda",
+      zh: "乌兹别克斯坦推进统一 E‑Logistics 平台",
+    },
+    summary: {
+      ru: "Проект предусматривает электронные грузовые документы, автоматический обмен данными с таможней и транспортным контролем, а также сквозное отслеживание доставки.",
+      ky: "Долбоор жүк документтерин электрондук форматка өткөрүүнү, бажы жана транспорт көзөмөлү менен автоматтык маалымат алмашууну, ошондой эле жеткирүүнү толук көзөмөлдөөнү карайт.",
+      uz: "Loyiha yuk hujjatlarini elektronlashtirish, bojxona va transport nazorati bilan avtomatik ma’lumot almashish hamda yetkazib berishni boshidan oxirigacha kuzatishni nazarda tutadi.",
+      zh: "项目计划将货运文件电子化，与海关和运输监管机构自动交换数据，并对货物从起运到交付进行全流程跟踪。",
+    },
+    sourceName: { ru: "Портал Министерства экономики и финансов", ky: "Экономика жана финансы министрлигинин порталы", uz: "Iqtisodiyot va moliya vazirligi portali", zh: "乌兹别克斯坦经济财政部门门户网站" },
+    photoCaption: { ru: "Железнодорожная станция Кант, Кыргызстан", ky: "Кант темир жол станциясы, Кыргызстан", uz: "Kant temir yo‘l stansiyasi, Qirg‘iziston", zh: "吉尔吉斯斯坦坎特铁路站实景" },
+    photoCredit: { ru: "A.Savin, Wikipedia · свободная лицензия Art Libre / Wikimedia Commons", ky: "A.Savin, Wikipedia · Art Libre эркин лицензиясы / Wikimedia Commons", uz: "A.Savin, Wikipedia · Art Libre erkin litsenziyasi / Wikimedia Commons", zh: "A.Savin, Wikipedia · Art Libre 自由艺术许可 / Wikimedia Commons" },
+  },
+  {
+    id: "middle-corridor", date: "2026-05-15", image: "/news/torugart-road.jpg",
+    sourceUrl: "https://gov.uz/en/mfa/news/view/166841",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:2015-09-09-092043_-_Zum_Torugart-Pass.jpg",
+    tag: { ru: "КОРИДОР", ky: "КОРИДОР", uz: "YO‘LAK", zh: "通道" },
+    title: {
+      ru: "Средний коридор планируют связать с новой железной дорогой",
+      ky: "Орто коридорду жаңы темир жол менен байланыштыруу пландалууда",
+      uz: "O‘rta yo‘lakni yangi temir yo‘l bilan bog‘lash rejalashtirilmoqda",
+      zh: "中间走廊拟与中吉乌铁路衔接",
+    },
+    summary: {
+      ru: "На саммите тюркских государств обозначены задачи по соединению Среднего коридора со строящейся железной дорогой и полной цифровизации обмена таможенными данными.",
+      ky: "Түрк мамлекеттеринин саммитинде Орто коридорду курулуп жаткан темир жолго туташтыруу жана бажы маалыматтарын толук санарип алмашуу милдеттери белгиленди.",
+      uz: "Turkiy davlatlar sammitida O‘rta yo‘lakni qurilayotgan temir yo‘lga ulash va bojxona ma’lumotlari almashinuvini to‘liq raqamlashtirish vazifalari belgilandi.",
+      zh: "突厥国家组织峰会提出，将中间走廊与在建中吉乌铁路衔接，并推动海关数据交换全面数字化。",
+    },
+    sourceName: { ru: "Правительственный портал Узбекистана", ky: "Өзбекстан Өкмөтүнүн порталы", uz: "O‘zbekiston Hukumat portali", zh: "乌兹别克斯坦政府门户网站" },
+    photoCaption: { ru: "Автодорога к перевалу Торугарт, Кыргызстан", ky: "Торугарт ашуусуна кеткен жол, Кыргызстан", uz: "Torugart dovoniga olib boruvchi yo‘l, Qirg‘iziston", zh: "吉尔吉斯斯坦通往吐尔尕特山口的公路实景" },
+    photoCredit: { ru: "Zossolino · лицензия CC BY-SA 4.0 / Wikimedia Commons", ky: "Zossolino · CC BY-SA 4.0 лицензиясы / Wikimedia Commons", uz: "Zossolino · CC BY-SA 4.0 litsenziyasi / Wikimedia Commons", zh: "Zossolino · CC BY-SA 4.0 授权 / Wikimedia Commons" },
+  },
+  {
+    id: "freight-cars", date: "2026-02-26", image: "/news/balykchy-station.jpg",
+    sourceUrl: "https://gov.uz/en/news/view/136854",
+    photoUrl: "https://commons.wikimedia.org/wiki/File:Balykchy_railway_station.jpg",
+    tag: { ru: "ВАГОНЫ", ky: "ВАГОН", uz: "VAGON", zh: "运力" },
+    title: {
+      ru: "Узбекистан расширяет парк грузовых вагонов",
+      ky: "Өзбекстан жүк вагондорунун паркын кеңейтүүдө",
+      uz: "O‘zbekiston yuk vagonlari parkini kengaytirmoqda",
+      zh: "乌兹别克斯坦扩大铁路货车运力",
+    },
+    summary: {
+      ru: "На 2026 год поставлена задача довести выпуск до 2 000 грузовых вагонов. Дополнительное финансирование должно обеспечить поставку ещё 1 350 вагонов.",
+      ky: "2026-жылы жүк вагондорун чыгарууну 2 000 даанага жеткирүү милдети коюлду. Кошумча каржылоо дагы 1 350 вагон жеткирүүгө багытталат.",
+      uz: "2026-yilda yuk vagonlari ishlab chiqarishni 2 000 donaga yetkazish vazifasi qo‘yildi. Qo‘shimcha moliyalashtirish yana 1 350 vagon yetkazib berishni ta’minlaydi.",
+      zh: "2026 年铁路货车产能目标提高至 2,000 辆，新增资金将用于保障再供应 1,350 辆货车。",
+    },
+    sourceName: { ru: "Правительственный портал Узбекистана", ky: "Өзбекстан Өкмөтүнүн порталы", uz: "O‘zbekiston Hukumat portali", zh: "乌兹别克斯坦政府门户网站" },
+    photoCaption: { ru: "Железнодорожная станция Балыкчы, Кыргызстан", ky: "Балыкчы темир жол станциясы, Кыргызстан", uz: "Baliqchi temir yo‘l stansiyasi, Qirg‘iziston", zh: "吉尔吉斯斯坦巴雷克奇铁路站实景" },
+    photoCredit: { ru: "Robert-Antonio · лицензия CC BY-SA 3.0 / Wikimedia Commons", ky: "Robert-Antonio · CC BY-SA 3.0 лицензиясы / Wikimedia Commons", uz: "Robert-Antonio · CC BY-SA 3.0 litsenziyasi / Wikimedia Commons", zh: "Robert-Antonio · CC BY-SA 3.0 授权 / Wikimedia Commons" },
+  },
+] as const;
 
 const processCopy = {
   ru: {
@@ -176,18 +430,56 @@ const processCopy = {
   },
 } as const;
 
-const kyrgyzProductNames: Record<string, string> = {
-  "screen-protector": "Смартфон үчүн коргоочу айнек", "phone-case": "Тунук соккуга чыдамдуу кап", "usb-c-cable": "Өрүлгөн USB-C тез кубаттоо кабели",
-  "phone-stand": "Бүктөлүүчү үстөл телефон кармагычы", "car-holder": "Унаанын желдеткичине телефон кармагыч", "selfie-stick": "Штативдүү селфи таякчасы",
-  "cable-organizer": "Кабель коргоочу жана иреттегич топтом", "hair-set": "Чач кыскычтар жана резинкалар топтому", "makeup-sponge": "Макияж губкасы жана пуф топтому",
-  "curling-ribbon": "Жылуулуксуз чач тармалдатуучу лента", "nail-set": "Тырмак чаптамалары жана жасалма тырмактар", "scarf-clasp": "Жоолук үчүн магниттик илгичтер жана брошкалар",
-  "jewelry-box": "Саякаттык зер буюмдар кутусу", "adhesive-hooks": "Тешпей жабыштырылуучу илгичтер", "drain-strainer": "Суу агызгыч чыпкалар топтому",
-  "vacuum-bags": "Вакуумдук кысуучу баштыктар топтому", "drawer-organizer": "Тартма бөлгүч жана ич кийим иреттегич", "travel-organizer": "Бут кийим кабы жана саякат иреттегичтери",
-  "gap-strip": "Раковина жана меш үчүн силикон тилкелер", "car-towels": "Унаа үчүн микрофибра сүлгүлөр", "seat-organizer": "Унаа отургуч аралыгына иреттегич",
-  "sunshade": "Алдыңкы айнекке бүктөлүүчү күн калкалоочу чатыр", "frost-cover": "Алдыңкы айнекке кышкы кар капкак", "uv-set": "Күндөн коргоочу жеңдер жана бет кап",
-  "winter-gloves": "Сенсордук экранга кышкы мээлейлер", "lint-remover": "USB-C түк тазалагыч", "bag-sealer": "USB-C кичи пакет жапкыч",
-  "usb-fan": "Колго жана үстөлгө USB-C желдеткич", "sensor-light": "Кыймыл сенсорлуу магниттик чырак", "shoe-dryer": "PTC бут кийим кургаткыч",
-};
+const trustStoryCopy = {
+  ru: {
+    eyebrow: "ПРОЗРАЧНЫЙ ПУТЬ ПОСТАВКИ", title: "От первого разговора до двери магазина", photo: "Реальная деловая сцена", stage: "Этап",
+    slides: [
+      ["Переговоры и закупка", "Менеджер уточняет модель, количество, цену и условия поставки по телефону или WhatsApp."],
+      ["Профессиональный подбор", "Специалисты проверяют товар на месте и подбирают позиции с учётом спроса вашего рынка."],
+      ["Железнодорожная доставка", "После упаковки груз отправляется по железной дороге в Кыргызстан или Узбекистан."],
+      ["Отправка с местного склада", "По прибытии груз принимается на местном складе, сверяется и готовится к последней доставке."],
+      ["Получение у двери", "Согласованный груз доставляется по адресу — предприниматель принимает и проверяет товар."],
+    ],
+  },
+  ky: {
+    eyebrow: "ЖЕТКИРҮҮНҮН АЧЫК ЖОЛУ", title: "Биринчи сүйлөшүүдөн дүкөндүн эшигине чейин", photo: "Чыныгы ишкердик көрүнүш", stage: "Этап",
+    slides: [
+      ["Сүйлөшүү жана сатып алуу", "Менеджер телефон же WhatsApp аркылуу модель, сан, баа жана жеткирүү шарттарын тактайт."],
+      ["Адистердин тандоосу", "Адистер товарды жеринде текшерип, сиздин базардын суроо-талабына ылайык позицияларды тандашат."],
+      ["Темир жол менен жеткирүү", "Таңгакталгандан кийин жүк Кыргызстанга же Өзбекстанга темир жол аркылуу жөнөтүлөт."],
+      ["Жергиликтүү кампадан жөнөтүү", "Жүк келгенде жергиликтүү кампада кабыл алынып, текшерилип, акыркы жеткирүүгө даярдалат."],
+      ["Эшиктен кабыл алуу", "Макулдашылган жүк көрсөтүлгөн дарекке жеткирилип, ишкер товарды кабыл алып текшерет."],
+    ],
+  },
+  uz: {
+    eyebrow: "SHAFFOF YETKAZIB BERISH YO‘LI", title: "Birinchi suhbatdan do‘kon eshigigacha", photo: "Haqiqiy biznes jarayoni", stage: "Bosqich",
+    slides: [
+      ["Muzokara va xarid", "Menejer telefon yoki WhatsApp orqali model, miqdor, narx va yetkazish shartlarini aniqlaydi."],
+      ["Mutaxassislar tanlovi", "Mutaxassislar mahsulotni joyida tekshiradi va bozoringiz talabiga mos pozitsiyalarni tanlaydi."],
+      ["Temir yo‘l orqali yetkazish", "Qadoqlangach, yuk Qirg‘iziston yoki O‘zbekistonga temir yo‘l orqali jo‘natiladi."],
+      ["Mahalliy ombordan jo‘natish", "Yuk kelgach, mahalliy omborda qabul qilinadi, tekshiriladi va so‘nggi yetkazishga tayyorlanadi."],
+      ["Eshik oldida qabul qilish", "Kelishilgan yuk ko‘rsatilgan manzilga yetkaziladi, tadbirkor mahsulotni qabul qilib tekshiradi."],
+    ],
+  },
+  zh: {
+    eyebrow: "看得见的采购履约", title: "从第一次沟通，到商户门前收货", photo: "真实业务场景图", stage: "采购阶段",
+    slides: [
+      ["沟通谈判，确认采购合作", "采购经理通过电话或 WhatsApp 确认商品型号、数量、价格与交付条件。"],
+      ["专业人员，实地选品", "专业人员在当地实地查看商品，并结合目标市场需求筛选更合适的货品。"],
+      ["铁路物流，跨境送货", "完成核验与装箱后，货物通过铁路运往吉尔吉斯斯坦或乌兹别克斯坦。"],
+      ["抵达当地，仓库发货", "货物到达当地仓库后完成入库核对，并按商户订单安排最后一段配送。"],
+      ["送到门前，商户收货", "货物送至约定地址，商户可在门前完成接收并核对商品。"],
+    ],
+  },
+} as const;
+
+const trustStoryImages = [
+  "/trust/01-negotiation.jpg",
+  "/trust/02-sourcing.jpg",
+  "/trust/03-rail.jpg",
+  "/trust/04-warehouse.jpg",
+  "/trust/05-delivery.jpg",
+] as const;
 
 const deliveryCities: Record<"kg" | "uz", Record<Lang, string[]>> = {
   kg: {
@@ -198,22 +490,24 @@ const deliveryCities: Record<"kg" | "uz", Record<Lang, string[]>> = {
   },
 };
 
-const currencyOptions: Array<{ code: Currency; label: string; perCny: number; locale: string; digits: number }> = [
-  { code: "CNY", label: "CNY ¥", perCny: 1, locale: "zh-CN", digits: 2 },
-  { code: "KGS", label: "KGS", perCny: 12.2, locale: "ru-RU", digits: 0 },
-  { code: "UZS", label: "UZS", perCny: 1750, locale: "uz-UZ", digits: 0 },
-  { code: "RUB", label: "RUB ₽", perCny: 11.3, locale: "ru-RU", digits: 0 },
-];
+const localePanelCopy: Record<Lang, { title: string; done: string; close: string }> = {
+  ru: { title: "Язык и валюта", done: "Готово", close: "Закрыть" },
+  ky: { title: "Тил жана акча бирдиги", done: "Даяр", close: "Жабуу" },
+  uz: { title: "Til va valyuta", done: "Tayyor", close: "Yopish" },
+  zh: { title: "语言与货币", done: "完成", close: "关闭" },
+};
+
+const mobileTopCopy: Record<Lang, string> = {
+  ru: "Закупки в Иу · Ж/д КНР–КР–УЗ",
+  ky: "Иу сатып алуу · КЭР–КР–ӨзР темир жолу",
+  uz: "Iu xaridi · XXR–QR–O‘zR temir yo‘li",
+  zh: "义乌集采 · 中吉乌铁路专线",
+};
 
 const priceNumber = (value: string) => Number(value.replace(/[^\d.]/g, ""));
 
-function formatCurrency(cnyValue: number, currency: Currency) {
-  const option = currencyOptions.find((item) => item.code === currency) ?? currencyOptions[0];
-  const value = cnyValue * option.perCny;
-  const formatted = new Intl.NumberFormat(option.locale, { maximumFractionDigits: option.digits, minimumFractionDigits: option.digits }).format(value);
-  if (currency === "CNY") return `¥ ${formatted}`;
-  if (currency === "RUB") return `₽ ${formatted}`;
-  return `${currency} ${formatted}`;
+function supportsPreciseHover() {
+  return typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 }
 
 const productName = (ru: string, uz: string, zh: string) => ({ ru, ky: ru, uz, zh });
@@ -250,6 +544,9 @@ const products = [
   { name: productName("Магнитный светильник с датчиком движения", "Harakat sensorli magnit shkaf chirog‘i", "人体感应磁吸柜灯"), image: "/products/29-motion-sensor-magnetic-cabinet-light.jpg", cost: "¥ 15.80", retail: { kg: "1 580 сом", uz: "218 000 so‘m" }, moq: 30, orders: 746, kind: "sensor-light" },
   { name: productName("PTC-сушилка для обуви", "PTC poyabzal quritgichi", "PTC恒温烘鞋器"), image: "/products/30-ptc-shoe-dryer.jpg", cost: "¥ 28.50", retail: { kg: "2 850 сом", uz: "395 000 so‘m" }, moq: 20, orders: 584, kind: "shoe-dryer" },
 ];
+
+const heroProductKinds = ["phone-case", "screen-protector", "bag-sealer"] as const;
+const productBadgeByKind = new Map(catalogProducts.map((product) => [product.kind, product.badge]));
 
 const productCategories: Record<string, CategoryId> = {
   "screen-protector": "digital", "phone-case": "digital", "usb-c-cable": "digital", "phone-stand": "digital",
@@ -305,16 +602,6 @@ function Icon({ name }: { name: string }) {
     arrow: <><path d="M5 12h14M14 7l5 5-5 5"/></>,
   };
   return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}>{paths[name]}</svg>;
-}
-
-function ProductVisual({ kind }: { kind: string }) {
-  const common = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  return <svg viewBox="0 0 180 150" aria-hidden="true" {...common}>
-    {kind === "kettle" && <><path d="M61 54h57l6 60H55l6-60Z"/><path d="M70 54V40h38v14M118 64c24-5 30 12 20 27-4 6-10 9-16 10M77 40c-10-24 32-24 25 0"/><path d="M68 91h42"/></>}
-    {kind === "box" && <><path d="M42 55h96v67H42z"/><path d="m42 55 14-20h68l14 20M56 35l18 20M124 35l-18 20M78 82h24M90 55v67"/></>}
-    {kind === "drill" && <><path d="M45 56h81l12 12-12 18H93v-9H45V56Z"/><path d="M92 86v36H68l-9-45M126 64h17M143 59v10M106 69h12"/><circle cx="78" cy="97" r="5"/></>}
-    {kind === "coat" && <><path d="m70 34 20 12 20-12 27 20-16 25-11-7v52H70V72l-11 7-16-25 27-20Z"/><path d="M90 46v78M72 34c2 16 34 16 36 0M70 87h20M110 87H90"/></>}
-  </svg>;
 }
 
 function BrandGuide({ onClose, selected, onSelect }: { onClose: () => void; selected: LogoVariant; onSelect: (variant: LogoVariant) => void }) {
@@ -379,8 +666,10 @@ function BrandGuide({ onClose, selected, onSelect }: { onClose: () => void; sele
 }
 
 export default function Home() {
-  const [lang, setLang] = useState<Lang>("ru");
-  const [currency, setCurrency] = useState<Currency>("KGS");
+  const preferences = useSyncExternalStore(subscribeToPreferences, getPreferencesSnapshot, () => defaultPreferences);
+  const { lang, currency } = preferences;
+  const setLang = (nextLang: Lang) => savePreferences({ ...getPreferencesSnapshot(), lang: nextLang });
+  const setCurrency = (nextCurrency: Currency) => savePreferences({ ...getPreferencesSnapshot(), currency: nextCurrency });
   const [market, setMarket] = useState<"kg" | "uz">("kg");
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [query, setQuery] = useState("");
@@ -390,32 +679,80 @@ export default function Home() {
   const [sameWhatsapp, setSameWhatsapp] = useState(true);
   const [preferredContact, setPreferredContact] = useState<"phone" | "whatsapp" | "email">("phone");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [showBrand, setShowBrand] = useState(false);
+  const [localeOpen, setLocaleOpen] = useState(false);
   const [logoVariant, setLogoVariant] = useState<LogoVariant>(1);
+  const [heroSlide, setHeroSlide] = useState(0);
+  const [heroPaused, setHeroPaused] = useState(false);
+  const [heroTouchStart, setHeroTouchStart] = useState<number | null>(null);
+  const [trustSlide, setTrustSlide] = useState(0);
+  const [trustPaused, setTrustPaused] = useState(false);
+  const [activeNewsId, setActiveNewsId] = useState<string | null>(null);
+  const newsGesture = useRef({ pointerId: null as number | null, startX: 0, startY: 0, dragged: false });
+  const [visibleCount, setVisibleCount] = useState(9);
   const t = copy[lang];
   const iq = inquiryCopy[lang];
   const s = siteCopy[lang];
   const pc = processCopy[lang];
+  const tc = trustStoryCopy[lang];
+  const hc = heroComparisonCopy[lang];
+  const nc = newsCopy[lang];
+  const sc = customerServiceCopy[lang];
+  const localeUi = localePanelCopy[lang];
+  const detailLabel = { ru: "Подробнее", ky: "Толугураак", uz: "Batafsil", zh: "查看详情" }[lang];
+  const loadMoreLabel = { ru: "Показать ещё", ky: "Дагы көрсөтүү", uz: "Yana ko‘rsatish", zh: "加载更多" }[lang];
+  const showingLabel = { ru: "Показано", ky: "Көрсөтүлдү", uz: "Ko‘rsatildi", zh: "已显示" }[lang];
   const productLabel = (product: (typeof products)[number]) => lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang];
-  const shownProducts = useMemo(() => products.filter((product) => {
+  const productHref = (kind: string) => buildProductHref(kind, lang, currency);
+  const heroProducts = useMemo(() => heroProductKinds.map((kind) => products.find((product) => product.kind === kind)).filter((product): product is (typeof products)[number] => Boolean(product)), []);
+  const filteredProducts = useMemo(() => products.filter((product) => {
     const matchesCategory = !selectedCategory || productCategories[product.kind] === selectedCategory;
     const matchesQuery = !query || (lang === "ky" ? kyrgyzProductNames[product.kind] : product.name[lang]).toLowerCase().includes(query.toLowerCase());
     return matchesCategory && matchesQuery;
   }), [query, lang, selectedCategory]);
+  const shownProducts = filteredProducts.slice(0, visibleCount);
   const activeCategory = categories.find(([id]) => id === selectedCategory);
   const selectedProducts = products.filter((product) => quoteItems[product.kind]);
   const quoteCount = selectedProducts.length;
+  const quoteSubtotalCny = selectedProducts.reduce((total, product) => total + priceNumber(product.cost) * quoteItems[product.kind], 0);
   const destinationOptions = deliveryCities[market][lang];
+  const activeNews = logisticsNews.find((item) => item.id === activeNewsId);
 
   useEffect(() => {
     document.documentElement.lang = lang === "zh" ? "zh-CN" : lang;
-    document.title = s.brand;
-  }, [lang, s.brand]);
+  }, [lang]);
 
   useEffect(() => {
-    document.body.style.overflow = drawerOpen ? "hidden" : "";
+    document.body.style.overflow = drawerOpen || localeOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [drawerOpen]);
+  }, [drawerOpen, localeOpen]);
+
+  useEffect(() => {
+    if (heroPaused || drawerOpen || showBrand || activeNewsId || heroProducts.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const interval = window.setInterval(() => setHeroSlide((current) => (current + 1) % heroProducts.length), 5000);
+    return () => window.clearInterval(interval);
+  }, [activeNewsId, drawerOpen, heroPaused, heroProducts.length, showBrand]);
+
+  useEffect(() => {
+    if (trustPaused || drawerOpen || showBrand || activeNewsId || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const interval = window.setInterval(() => setTrustSlide((current) => (current + 1) % trustStoryImages.length), 5200);
+    return () => window.clearInterval(interval);
+  }, [activeNewsId, drawerOpen, showBrand, trustPaused]);
+
+  useEffect(() => {
+    const closeNews = (event: KeyboardEvent) => { if (event.key === "Escape") setActiveNewsId(null); };
+    window.addEventListener("keydown", closeNews);
+    return () => window.removeEventListener("keydown", closeNews);
+  }, []);
+
+  useEffect(() => {
+    if (!localeOpen) return;
+    const closeLocale = (event: KeyboardEvent) => { if (event.key === "Escape") setLocaleOpen(false); };
+    window.addEventListener("keydown", closeLocale);
+    return () => window.removeEventListener("keydown", closeLocale);
+  }, [localeOpen]);
 
   const retailInCny = (product: (typeof products)[number]) => {
     const sourceCurrency: Currency = market === "kg" ? "KGS" : "UZS";
@@ -423,14 +760,60 @@ export default function Home() {
     return priceNumber(product.retail[market]) / sourceRate;
   };
 
-  const addToQuote = (product: (typeof products)[number]) => {
+  const changeHeroSlide = (direction: number) => {
+    setHeroSlide((current) => (current + direction + heroProducts.length) % heroProducts.length);
+  };
+
+  const heroProduct = heroProducts[heroSlide % heroProducts.length];
+  const heroRetailCny = heroProduct ? retailInCny(heroProduct) : 0;
+  const heroCostCny = heroProduct ? priceNumber(heroProduct.cost) : 0;
+  const heroGapCny = Math.max(0, heroRetailCny - heroCostCny);
+
+  const animateProductToQuote = (source: HTMLElement | null) => {
+    if (!source || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const sourceRect = source.getBoundingClientRect();
+
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>(".quote-tab");
+      if (!target) return;
+      const targetRect = target.getBoundingClientRect();
+      const flyer = source.cloneNode(true) as HTMLElement;
+      flyer.className = "product-card quote-flyer";
+      flyer.setAttribute("aria-hidden", "true");
+      flyer.style.left = `${sourceRect.left}px`;
+      flyer.style.top = `${sourceRect.top}px`;
+      flyer.style.width = `${sourceRect.width}px`;
+      flyer.style.height = `${sourceRect.height}px`;
+      document.body.appendChild(flyer);
+
+      const dx = targetRect.left + targetRect.width / 2 - (sourceRect.left + sourceRect.width / 2);
+      const dy = targetRect.top + targetRect.height / 2 - (sourceRect.top + sourceRect.height / 2);
+      const finalScale = Math.max(.08, Math.min(.16, targetRect.width / sourceRect.width));
+      const flight = flyer.animate([
+        { transform: "translate3d(0,0,0) scale(1)", opacity: 1, offset: 0 },
+        { transform: `translate3d(${dx * .68}px,${dy * .48 - 34}px,0) scale(.48) rotate(2deg)`, opacity: .88, offset: .58 },
+        { transform: `translate3d(${dx}px,${dy}px,0) scale(${finalScale}) rotate(5deg)`, opacity: .08, offset: 1 },
+      ], { duration: 720, easing: "cubic-bezier(.22,.8,.24,1)", fill: "forwards" });
+
+      flight.finished.then(() => {
+        flyer.remove();
+        target.animate([
+          { transform: "translateX(0) scale(1)" },
+          { transform: "translateX(-4px) scale(1.13)" },
+          { transform: "translateX(0) scale(1)" },
+        ], { duration: 300, easing: "cubic-bezier(.2,.8,.3,1)" });
+      }).catch(() => flyer.remove());
+    }));
+  };
+
+  const addToQuote = (product: (typeof products)[number], source: HTMLElement | null = null) => {
     if (quoteItems[product.kind]) {
       setDrawerOpen(true);
       return;
     }
     setQuoteItems((current) => ({ ...current, [product.kind]: product.moq }));
     setSubmitted(false);
-    if (quoteCount === 0) setDrawerOpen(true);
+    animateProductToQuote(source);
   };
 
   const updateQuantity = (kind: string, quantity: number, minimum: number) => {
@@ -447,53 +830,190 @@ export default function Home() {
     setSubmitted(false);
   };
 
-  const submitInquiry = (event: FormEvent<HTMLFormElement>) => {
+  const submitInquiry = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setSubmitting(true);
+    setSubmitted(false);
+    setSubmitError("");
+    try {
+      const context = getClientContext();
+      const phone = `${String(data.get("phoneCountryCode") ?? "")} ${String(data.get("phone") ?? "")}`.trim();
+      const whatsapp = sameWhatsapp ? phone : `${String(data.get("whatsappCountryCode") ?? "")} ${String(data.get("whatsapp") ?? "")}`.trim();
+      const response = await fetch("/api/inquiries", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...context,
+          website: data.get("website"),
+          destination: data.get("destination"),
+          phone,
+          whatsapp,
+          email: data.get("email"),
+          preferredContact: data.get("preferredContact"),
+          note: data.get("note"),
+          language: lang,
+          currency,
+          market,
+          items: selectedProducts.map((product) => ({ kind: product.kind, name: productLabel(product), quantity: quoteItems[product.kind], unitPriceCny: priceNumber(product.cost) })),
+        }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Inquiry submission failed");
+      setSubmitted(true);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : "Inquiry submission failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  return <main className="market-shell">
-    <div className="top-strip"><span>{s.top[0]}</span><i/><span>{s.top[1]}</span><i/><span>{s.top[2]}</span><div className="strip-route"><b>{s.stops[0]}</b><span>{s.stops[1]}</span><span>{s.stops[2]}</span><span>{s.stops[3]}</span></div></div>
+  const openCustomerService = (method: ContactMethod) => {
+    setPreferredContact(method);
+    setSubmitted(false);
+    setDrawerOpen(true);
+  };
+
+  return <main className={`market-shell currency-${currency.toLowerCase()} lang-${lang}`}>
+    <div className="top-strip"><span className="top-copy-mobile">{mobileTopCopy[lang]}</span><span className="top-copy-desktop">{s.top[0]}</span><i/><span className="top-copy-desktop">{s.top[1]}</span><i/><span className="top-copy-desktop">{s.top[2]}</span><div className="strip-route"><b>{s.stops[0]}</b><span>{s.stops[1]}</span><span>{s.stops[2]}</span><span>{s.stops[3]}</span></div></div>
     <header className="site-header">
       <Logo variant={logoVariant} lang={lang}/>
       <nav aria-label={s.navLabel}>{t.nav.map((item, i) => <a href={i === 0 ? "#categories" : i === 2 ? "#route" : "#products"} key={item}>{item}</a>)}</nav>
       <div className="header-actions">
-        <label className="language-select"><span className="sr-only">{s.languageLabel}</span><select value={lang} onChange={(e) => { setLang(e.target.value as Lang); setNotice(""); }}>{(Object.keys(copy) as Lang[]).map((key) => <option key={key} value={key}>{copy[key].label}</option>)}</select></label>
+        <label className="language-select" data-code={lang === "zh" ? "中" : lang.toUpperCase()}><span className="sr-only">{s.languageLabel}</span><select value={lang} onChange={(e) => { setLang(e.target.value as Lang); setVisibleCount(9); setNotice(""); }}>{(Object.keys(copy) as Lang[]).map((key) => <option key={key} value={key}>{copy[key].label}</option>)}</select></label>
         <label className="currency-select"><span className="sr-only">{s.currencyLabel}</span><select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>{currencyOptions.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
-        <button className="quote-button" onClick={() => setDrawerOpen(true)} aria-expanded={drawerOpen} aria-controls="inquiry-drawer"><Icon name="cart"/>{iq.list}<span>{quoteCount}</span></button>
       </div>
+      <button className="mobile-locale-trigger" type="button" onClick={() => { setLocaleOpen(true); setDrawerOpen(false); setActiveNewsId(null); }} aria-expanded={localeOpen} aria-controls="mobile-locale-panel" aria-label={`${s.languageLabel}: ${copy[lang].label}; ${s.currencyLabel}: ${currency}`}>
+        <span>{lang === "zh" ? "中" : lang.toUpperCase()}</span><i aria-hidden="true"/><b>{currency}</b><small aria-hidden="true">⌄</small>
+      </button>
     </header>
+    {localeOpen && <>
+      <button className="locale-backdrop" type="button" onClick={() => setLocaleOpen(false)} aria-label={localeUi.close}/>
+      <section className="locale-panel" id="mobile-locale-panel" role="dialog" aria-modal="true" aria-labelledby="mobile-locale-title">
+        <header className="locale-panel-header"><div><small>{s.languageLabel} · {s.currencyLabel}</small><h2 id="mobile-locale-title">{localeUi.title}</h2></div><button type="button" onClick={() => setLocaleOpen(false)} aria-label={localeUi.close}>×</button></header>
+        <fieldset><legend>{s.languageLabel}</legend><div className="locale-options language-options">{(Object.keys(copy) as Lang[]).map((key) => <button type="button" className={lang === key ? "active" : ""} key={key} onClick={() => { setLang(key); setVisibleCount(9); setNotice(""); }}><b>{key === "zh" ? "中" : key.toUpperCase()}</b><span>{copy[key].label}</span></button>)}</div></fieldset>
+        <fieldset><legend>{s.currencyLabel}</legend><div className="locale-options currency-options">{currencyOptions.map((item) => <button type="button" className={currency === item.code ? "active" : ""} key={item.code} onClick={() => setCurrency(item.code)}><b>{item.code}</b><span>{item.label}</span></button>)}</div></fieldset>
+        <button className="locale-done" type="button" onClick={() => setLocaleOpen(false)}>{localeUi.done}</button>
+      </section>
+    </>}
     {notice && <button className="toast" onClick={() => setNotice("")}>{notice}<b>×</b></button>}
     {showBrand ? <BrandGuide onClose={() => setShowBrand(false)} selected={logoVariant} onSelect={setLogoVariant}/> : <>
     <section className="workspace">
-      <div className="workspace-reserved" aria-hidden="true"/>
+      <aside className="news-rail" aria-label={nc.title} onPointerLeave={(event) => { if (event.pointerType === "mouse" && supportsPreciseHover()) setActiveNewsId(null); }}>
+        <header className="news-rail-heading"><span>{nc.eyebrow}</span><h2>{nc.title}</h2><small><i/>{nc.verified}</small></header>
+        <div className="news-list">
+          {logisticsNews.map((item) => {
+            const selected = item.id === activeNewsId;
+            return <button
+              className={`news-item ${selected ? "active" : ""}`}
+              key={item.id}
+              onPointerEnter={(event) => { if (event.pointerType === "mouse" && supportsPreciseHover()) setActiveNewsId(item.id); }}
+              onPointerDown={(event) => {
+                if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+                newsGesture.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, dragged: false };
+              }}
+              onPointerMove={(event) => {
+                const gesture = newsGesture.current;
+                if (gesture.pointerId !== event.pointerId || gesture.dragged) return;
+                if (Math.abs(event.clientX - gesture.startX) > 10 || Math.abs(event.clientY - gesture.startY) > 10) gesture.dragged = true;
+              }}
+              onClick={(event) => {
+                const wasDrag = event.detail > 0 && newsGesture.current.dragged;
+                newsGesture.current = { pointerId: null, startX: 0, startY: 0, dragged: false };
+                if (wasDrag) {
+                  event.preventDefault();
+                  return;
+                }
+                setActiveNewsId(item.id);
+              }}
+              aria-expanded={selected}
+              aria-haspopup="dialog"
+              aria-controls="news-detail"
+            >
+              <time dateTime={item.date}>{item.date.slice(5).replace("-", ".")}</time>
+              <span><em>{item.tag[lang]}</em><strong>{item.title[lang]}</strong></span>
+              <b aria-hidden="true">›</b>
+            </button>;
+          })}
+        </div>
+        {activeNews && <article className="news-detail" id="news-detail" aria-label={`${nc.detail}: ${activeNews.title[lang]}`}>
+          <div className="news-detail-photo">
+            <Image src={`${BASE_PATH}${activeNews.image}`} alt={activeNews.photoCaption[lang]} fill sizes="(max-width: 760px) 100vw, 420px"/>
+            <span>{activeNews.tag[lang]}</span>
+            <button onClick={() => setActiveNewsId(null)} aria-label={nc.close}>×</button>
+          </div>
+          <div className="news-detail-body">
+            <div className="news-detail-meta"><time dateTime={activeNews.date}>{activeNews.date.replaceAll("-", ".")}</time><span>{nc.detail}</span></div>
+            <h3>{activeNews.title[lang]}</h3>
+            <p>{activeNews.summary[lang]}</p>
+            <div className="news-detail-source"><span><small>{nc.source}</small><b>{activeNews.sourceName[lang]}</b></span><a href={activeNews.sourceUrl} target="_blank" rel="noreferrer">{nc.open}<i>↗</i></a></div>
+            <a className="news-photo-credit" href={activeNews.photoUrl} target="_blank" rel="noreferrer"><small>{nc.photo} · {activeNews.photoCaption[lang]}</small><span>{activeNews.photoCredit[lang]}</span></a>
+          </div>
+        </article>}
+      </aside>
+      {activeNews && <button className="news-mobile-backdrop" onClick={() => setActiveNewsId(null)} aria-label={nc.close}/>}
 
       <div className="hero" id="route">
         <div className="hero-copy"><span className="eyebrow"><i/>{t.eyebrow}</span><h1>{t.title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1><p>{t.subtitle}</p>
-          <div className="hero-actions"><a className="primary-cta" href="#products">{t.cta}<Icon name="arrow"/></a><button className="secondary-cta" onClick={() => setNotice(s.logisticsNotice)}>{t.logistics}</button></div>
+          <div className="hero-actions"><a className="primary-cta" href="#products">{t.cta}<Icon name="arrow"/></a><button className="hero-contact-cta" type="button" onClick={() => openCustomerService("whatsapp")}>{sc.heroContact}</button></div>
         </div>
-        <div className="route-visual" aria-label={t.route}><div className="sun-disc"/><div className="route-card"><span>{t.route}</span><strong>{t.days}</strong><small>{t.arrival}</small></div>
-          <svg viewBox="0 0 430 260" aria-hidden="true"><path className="land" d="M28 197c48-62 92-67 139-30 45-75 101-91 159-35 24-22 51-23 77-4v97H28Z"/><path className="rail" d="M32 214C139 189 237 189 405 151"/><path className="rail rail-two" d="M34 225c111-25 212-26 373-62"/><path className="track" d="m74 205 7 11m44-23 7 11m48-22 7 11m49-21 7 11m49-24 7 11m48-23 7 11"/><g className="train"><path d="M265 129h69l18 20-5 20-77 16-13-16Z"/><path d="M277 139h18v13h-22M302 139h23l11 13h-34Z"/><circle cx="280" cy="176" r="7"/><circle cx="330" cy="166" r="7"/></g></svg>
-          <div className="route-cities"><span className="china">{s.china}</span><span className="kg">KG</span><span className="uz">UZ</span></div>
+        <div className="hero-price-shell">
+          <section
+            className="hero-price-carousel"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label={hc.carousel}
+            onMouseEnter={() => setHeroPaused(true)}
+            onMouseLeave={() => setHeroPaused(false)}
+            onFocusCapture={() => setHeroPaused(true)}
+            onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setHeroPaused(false); }}
+            onTouchStart={(event) => setHeroTouchStart(event.touches[0]?.clientX ?? null)}
+            onTouchEnd={(event) => {
+              const end = event.changedTouches[0]?.clientX;
+              if (heroTouchStart !== null && end !== undefined && Math.abs(end - heroTouchStart) > 40) changeHeroSlide(end > heroTouchStart ? -1 : 1);
+              setHeroTouchStart(null);
+            }}
+          >
+            <div className="hero-price-slide" key={`${heroProduct.kind}-${market}-${currency}-${lang}`} aria-live="polite">
+              <header className="hero-price-head">
+                <Image src={`${BASE_PATH}${heroProduct.image}`} alt={productLabel(heroProduct)} width={52} height={52} sizes="52px" priority={heroSlide === 0}/>
+                <div><strong>{productLabel(heroProduct)}</strong><span>{hc.label} · {t.moq} {heroProduct.moq} {t.pieces}</span></div>
+                <small>{market === "kg" ? s.kgCity : s.uzCity}</small>
+              </header>
+              <div className="hero-price-compare">
+                <div className="hero-price-value"><span>{hc.source}</span><strong>{formatUnitCurrency(heroCostCny, currency)}</strong><small>{hc.verified}</small></div>
+                <i aria-hidden="true">→</i>
+                <div className="hero-price-value local"><span>{hc.local}</span><strong>{formatUnitCurrency(heroRetailCny, currency)}</strong><small>{hc.reference}</small></div>
+              </div>
+              <div className="hero-price-result">
+                <div><span>{hc.gap}</span><strong>+{formatUnitCurrency(heroGapCny, currency)}</strong><small>{hc.disclaimer}</small></div>
+                <b aria-hidden="true">{String(heroSlide + 1).padStart(2, "0")} / {String(heroProducts.length).padStart(2, "0")}</b>
+              </div>
+            </div>
+            <div className="hero-carousel-dots">{heroProducts.map((product, index) => <button key={product.kind} className={index === heroSlide ? "active" : ""} onClick={() => setHeroSlide(index)} aria-label={`${hc.show} ${index + 1}`} aria-current={index === heroSlide ? "true" : undefined}/>)}</div>
+          </section>
         </div>
       </div>
     </section>
 
-    <section className="search-band"><div className="search-box"><Icon name="search"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search}/><button onClick={() => document.querySelector("#products")?.scrollIntoView({behavior:"smooth"})}>{t.cta}</button></div><div className="market-toggle"><span>{t.country}</span><button className={market === "kg" ? "active" : ""} onClick={() => setMarket("kg")}>🇰🇬 {s.kgCountry}</button><button className={market === "uz" ? "active" : ""} onClick={() => setMarket("uz")}>🇺🇿 {s.uzCountry}</button></div></section>
+    <section className="search-band"><div className="search-box"><Icon name="search"/><input value={query} onChange={(e) => { setQuery(e.target.value); setVisibleCount(9); }} placeholder={t.search}/><button onClick={() => document.querySelector("#products")?.scrollIntoView({behavior:"smooth"})}>{t.cta}</button></div><div className="market-toggle"><span>{t.country}</span><button className={market === "kg" ? "active" : ""} onClick={() => setMarket("kg")}>🇰🇬 {s.kgCountry}</button><button className={market === "uz" ? "active" : ""} onClick={() => setMarket("uz")}>🇺🇿 {s.uzCountry}</button></div></section>
 
-    <div className="mobile-category-filter" aria-label={t.categories}>
-      <button className={!selectedCategory ? "active" : ""} onClick={() => setSelectedCategory(null)}>{t.all}<b>{products.length}</b></button>
-      {categories.map(([icon, names]) => <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => setSelectedCategory(icon)}>{names[lang]}<b>{products.filter((product) => productCategories[product.kind] === icon).length}</b></button>)}
+    <div className="mobile-category-shell">
+      <div className="mobile-category-filter" aria-label={t.categories}>
+        <button className={!selectedCategory ? "active" : ""} onClick={() => { setSelectedCategory(null); setVisibleCount(9); }}>{t.all}<b>{products.length}</b></button>
+        {categories.map(([icon, names]) => <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => { setSelectedCategory(icon); setVisibleCount(9); }}>{names[lang]}<b>{products.filter((product) => productCategories[product.kind] === icon).length}</b></button>)}
+      </div>
     </div>
 
     <section className="products-section" id="products">
-      <div className="section-title"><div><span>2026 · {s.trend}</span><h2>{activeCategory ? activeCategory[1][lang] : t.market}</h2><p>{t.marketSub}</p></div><button onClick={() => setSelectedCategory(null)}>{t.all}<Icon name="arrow"/></button></div>
+      <div className="section-title"><div><span>2026 · {s.trend}</span><h2>{activeCategory ? activeCategory[1][lang] : t.market}</h2><p>{t.marketSub}</p></div></div>
       <div className="catalog-layout">
       <aside className="category-panel" id="categories">
-        <div className="panel-heading"><strong>{t.categories}</strong><button onClick={() => setSelectedCategory(null)} aria-label={t.all}>☰</button></div>
+        <div className="panel-heading"><strong>{t.categories}</strong><button onClick={() => { setSelectedCategory(null); setVisibleCount(9); }} aria-label={t.all}>☰</button></div>
         <div className="category-list">{categories.map(([icon, names]) => {
           const count = products.filter((product) => productCategories[product.kind] === icon).length;
-          return <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => setSelectedCategory((current) => current === icon ? null : icon)} aria-pressed={selectedCategory === icon}>
+          return <button className={selectedCategory === icon ? "active" : ""} key={icon} onClick={() => { setSelectedCategory((current) => current === icon ? null : icon); setVisibleCount(9); }} aria-pressed={selectedCategory === icon}>
             <span className="category-icon"><Icon name={icon}/></span><span>{names[lang]}</span><b><em>{count}</em>›</b>
           </button>;
         })}</div>
@@ -501,24 +1021,26 @@ export default function Home() {
       </aside>
       <div className="product-grid">{shownProducts.map((product) => {
         const isAdded = Boolean(quoteItems[product.kind]);
+        const badge = productBadgeByKind.get(product.kind);
         return <article className={`product-card ${isAdded ? "in-quote" : ""}`} key={product.kind}>
-          <div className="product-image"><span className="product-badge">{market === "kg" ? "KG" : "UZ"} {s.badge}</span><img src={`${BASE_PATH}${product.image}`} alt={productLabel(product)}/><button aria-label={s.save}>♡</button></div>
+          <Link className="product-image" href={productHref(product.kind)} aria-label={`${detailLabel}: ${productLabel(product)}`}>{badge && <span className={`product-badge ${badge}`}>{productBadgeCopy[lang][badge]}</span>}<Image src={`${BASE_PATH}${product.image}`} alt={productLabel(product)} fill loading="lazy" sizes="(max-width: 760px) 50vw, (max-width: 1050px) 50vw, 33vw"/></Link>
           <div className="product-info">
-            <h3>{productLabel(product)}</h3>
+            <h3><Link href={productHref(product.kind)}>{productLabel(product)}</Link></h3>
             <div className="product-pricing">
-              <div className="price-block purchase"><span>{t.chinaPrice}</span><strong>{formatCurrency(priceNumber(product.cost), currency)}</strong></div>
+              <div className="price-block purchase"><span>{t.chinaPrice}</span><strong>{formatUnitCurrency(priceNumber(product.cost), currency)}</strong></div>
               <div className="price-block retail"><span>{t.localPrice}</span><strong>{formatCurrency(retailInCny(product), currency)}</strong></div>
             </div>
             <div className="product-meta"><span>{t.moq} {product.moq} {t.pieces}</span><span>{product.orders} {t.orders}</span></div>
             <div className="product-footer">
               <span><i/>{t.rail} → {market === "kg" ? s.kgCity : s.uzCity}</span>
-              <button className={isAdded ? "added" : ""} onClick={() => addToQuote(product)} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button>
+              <div><Link href={productHref(product.kind)}>{detailLabel} <b aria-hidden="true">→</b></Link><button className={isAdded ? "added" : ""} onClick={(event) => addToQuote(product, event.currentTarget.closest<HTMLElement>(".product-card"))} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button></div>
             </div>
           </div>
         </article>;
       })}
         {shownProducts.length === 0 && <div className="empty-state">{s.empty}</div>}</div>
       </div>
+      {filteredProducts.length > 0 && <div className="catalog-pagination" aria-live="polite"><span>{showingLabel} {shownProducts.length} / {filteredProducts.length}</span>{shownProducts.length < filteredProducts.length && <button onClick={() => setVisibleCount((count) => count + 9)}>{loadMoreLabel}<b>+{Math.min(9, filteredProducts.length - shownProducts.length)}</b></button>}</div>}
     </section>
 
     <section className="process-section" id="process">
@@ -534,34 +1056,78 @@ export default function Home() {
         <button onClick={() => quoteCount > 0 ? setDrawerOpen(true) : document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" })}>{quoteCount > 0 ? pc.quote : pc.choose}<Icon name="arrow"/></button>
       </div>
     </section>
+
+    <section className="trust-story-section" aria-label={tc.title}>
+      <div
+        className="trust-story"
+        data-stage={trustSlide}
+        role="region"
+        aria-roledescription="carousel"
+        onMouseEnter={() => setTrustPaused(true)}
+        onMouseLeave={() => setTrustPaused(false)}
+        onFocus={() => setTrustPaused(true)}
+        onBlur={() => setTrustPaused(false)}
+      >
+        <Image key={`${lang}-${trustSlide}`} className="trust-story-image" src={`${BASE_PATH}${trustStoryImages[trustSlide]}`} alt={tc.slides[trustSlide][0]} fill sizes="100vw"/>
+        <div className="trust-story-shade"/>
+        <article className="trust-story-copy" key={`copy-${lang}-${trustSlide}`}>
+          <span className="trust-story-eyebrow"><i/>{tc.eyebrow}</span>
+          <small>{tc.stage} {String(trustSlide + 1).padStart(2, "0")} / {String(trustStoryImages.length).padStart(2, "0")}</small>
+          <h2>{tc.title}</h2>
+          <h3>{tc.slides[trustSlide][0]}</h3>
+          <p>{tc.slides[trustSlide][1]}</p>
+          <b><i/> {tc.photo}</b>
+        </article>
+        <div className="trust-story-nav" role="tablist" aria-label={tc.title}>
+          {tc.slides.map(([title], index) => <button
+            key={title}
+            type="button"
+            role="tab"
+            aria-selected={index === trustSlide}
+            className={index === trustSlide ? "active" : ""}
+            onClick={() => setTrustSlide(index)}
+          ><span>{String(index + 1).padStart(2, "0")}</span><strong>{title}</strong></button>)}
+        </div>
+      </div>
+    </section>
     </>}
 
-    {quoteCount > 0 && <button className={`quote-tab ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen((open) => !open)} aria-label={`${iq.list}: ${quoteCount}`}>
+    <CustomerServiceDock lang={lang} onRequest={openCustomerService}/>
+
+    {quoteCount > 0 && <button className={`quote-tab ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen((open) => !open)} aria-label={`${iq.list}: ${quoteCount}`} title={`${iq.list}: ${quoteCount}`}>
       <Icon name="cart"/><span>{iq.list}</span><b>{quoteCount}</b>
     </button>}
 
     {drawerOpen && <button className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-label={iq.close}/>}
     <aside id="inquiry-drawer" className={`inquiry-drawer ${drawerOpen ? "open" : ""}`} role="dialog" aria-modal="true" aria-labelledby="inquiry-title" aria-hidden={!drawerOpen}>
       <header className="drawer-header">
-        <div><span>{iq.list} · {quoteCount}</span><h2 id="inquiry-title">{iq.title}</h2><p>{iq.subtitle}</p></div>
+        <div><span>{quoteCount > 0 ? `${iq.list} · ${quoteCount}` : sc.manager}</span><h2 id="inquiry-title">{quoteCount > 0 ? iq.title : sc.genericTitle}</h2><p>{quoteCount > 0 ? iq.subtitle : sc.genericSubtitle}</p></div>
         <button onClick={() => setDrawerOpen(false)} aria-label={iq.close}>×</button>
       </header>
 
-      {quoteCount === 0 ? <div className="drawer-empty"><Icon name="cart"/><p>{iq.empty}</p><button onClick={() => { setDrawerOpen(false); document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" }); }}>{t.cta}</button></div> : <>
+      {quoteCount === 0 ? <div className="drawer-contact-intro"><b>01</b><p>{sc.genericHint}</p><button type="button" onClick={() => { setDrawerOpen(false); document.querySelector("#products")?.scrollIntoView({ behavior: "smooth" }); }}>{t.cta}</button></div> :
         <div className="inquiry-products">
           {selectedProducts.map((product) => <article key={product.kind}>
-            <img src={`${BASE_PATH}${product.image}`} alt=""/>
+            <Image src={`${BASE_PATH}${product.image}`} alt="" width={58} height={58} sizes="58px"/>
             <div className="inquiry-product-copy">
               <h3>{productLabel(product)}</h3>
-              <span>{formatCurrency(priceNumber(product.cost), currency)} / {t.pieces}</span>
+              <span>{formatUnitCurrency(priceNumber(product.cost), currency)} / {t.pieces} × {quoteItems[product.kind]}</span>
               <label>{iq.quantity}<input type="number" min={product.moq} step="1" value={quoteItems[product.kind]} onChange={(event) => updateQuantity(product.kind, Number(event.target.value), product.moq)}/></label>
             </div>
-            <div className="inquiry-product-side"><strong>{formatCurrency(priceNumber(product.cost) * quoteItems[product.kind], currency)}</strong><button onClick={() => removeFromQuote(product.kind)}>{iq.remove}</button></div>
+            <div className="inquiry-product-side"><strong>{formatUnitCurrency(priceNumber(product.cost) * quoteItems[product.kind], currency)}</strong><button onClick={() => removeFromQuote(product.kind)}>{iq.remove}</button></div>
           </article>)}
-          <p className="exchange-note">{iq.exchange} · {currency}</p>
-        </div>
+          <section className="inquiry-breakdown" aria-label={iq.subtotal}>
+            <div className="inquiry-subtotal"><span>{iq.subtotal}</span><strong>{formatUnitCurrency(quoteSubtotalCny, currency)}</strong></div>
+            <dl>
+              <div><dt>{iq.rate}</dt><dd>{formatExchangeRate(currency)}</dd></div>
+              <div><dt>{iq.excluded}</dt><dd>{iq.excludedDetail}</dd></div>
+            </dl>
+            <p>{iq.exchange} · {currency}</p>
+          </section>
+        </div>}
 
-        <form className="contact-form" onSubmit={submitInquiry}>
+      <form className="contact-form" onSubmit={submitInquiry}>
+          <label className="form-honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off"/></label>
           <label className="field full"><span>{iq.destination}</span><select name="destination" defaultValue={destinationOptions[0]}>{destinationOptions.map((city) => <option key={city}>{city}</option>)}</select></label>
           <label className="field full"><span>{iq.phone} *</span><div className="phone-field"><select name="phoneCountryCode" key={market} defaultValue={market === "kg" ? "+996" : "+998"}><option>+996</option><option>+998</option><option>+7</option><option>+86</option></select><input name="phone" type="tel" inputMode="tel" autoComplete="tel" required placeholder="000 000 000"/></div></label>
           <label className="check-field full"><input type="checkbox" checked={sameWhatsapp} onChange={(event) => setSameWhatsapp(event.target.checked)}/><span>{iq.sameWhatsapp}</span></label>
@@ -571,13 +1137,13 @@ export default function Home() {
             {(["phone", "whatsapp", "email"] as const).map((method) => <button type="button" key={method} className={preferredContact === method ? "active" : ""} onClick={() => setPreferredContact(method)}>{method === "phone" ? iq.phoneFirst : method === "whatsapp" ? iq.whatsappFirst : iq.emailFirst}</button>)}
           </div><input type="hidden" name="preferredContact" value={preferredContact}/></fieldset>
           <label className="field full"><span>{iq.note}</span><textarea name="note" rows={3} placeholder={iq.notePlaceholder}/></label>
-          <button className="submit-inquiry full" type="submit">{iq.submit}<Icon name="arrow"/></button>
+          <button className="submit-inquiry full" type="submit" disabled={submitting}>{submitting ? "…" : iq.submit}<Icon name="arrow"/></button>
           <p className="response-note full">{iq.response}<span>{iq.free}</span></p>
+          {submitError && <div className="inquiry-error full" role="alert">{submitError}</div>}
           {submitted && <div className="inquiry-success full" role="status">✓ {iq.success}</div>}
-        </form>
-      </>}
+      </form>
     </aside>
 
-    <footer><Logo variant={logoVariant} lang={lang}/><p>{s.footerTagline}</p><span>{s.copyright}</span></footer>
+    <footer><Logo variant={logoVariant} lang={lang}/><p>{s.footerTagline}</p><nav aria-label="Legal"><Link href="/company">{lang === "zh" ? "公司信息" : "О компании"}</Link><Link href="/privacy">{lang === "zh" ? "隐私政策" : "Конфиденциальность"}</Link></nav><span>{s.copyright}</span></footer>
   </main>;
 }
