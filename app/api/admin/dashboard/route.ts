@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { inquiryStatuses, type InquiryStatus } from "../../../backend/contracts";
 import { readSession } from "../../../backend/auth";
 import { getAdminSnapshot } from "../../../backend/server";
+import { logError } from "../../../backend/http";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const requestId = crypto.randomUUID();
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "请先登录" }, { status: 401 });
   try {
@@ -13,10 +15,12 @@ export async function GET(request: Request) {
     const days = Number(parameters.get("days") ?? 30);
     const requestedStatus = parameters.get("status") ?? "all";
     const status = (requestedStatus === "all" || inquiryStatuses.includes(requestedStatus as InquiryStatus)) ? requestedStatus as InquiryStatus | "all" : "all";
-    const snapshot = await getAdminSnapshot(days, status, (parameters.get("search") ?? "").slice(0, 80));
+    const page = Number(parameters.get("page") ?? 1);
+    const pageSize = Number(parameters.get("pageSize") ?? 50);
+    const snapshot = await getAdminSnapshot(days, status, (parameters.get("search") ?? "").slice(0, 80), page, pageSize);
     return NextResponse.json({ ok: true, user: session, snapshot });
   } catch (error) {
-    console.error("admin dashboard error", error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "后台数据暂时不可用" }, { status: 503 });
+    logError("admin.dashboard", error, { requestId });
+    return NextResponse.json({ error: "后台数据暂时不可用", requestId }, { status: 503 });
   }
 }

@@ -6,7 +6,7 @@
 - 数据库：Supabase PostgreSQL，通过服务端 REST API 访问
 - 管理后台：`https://你的域名/admin`
 - 健康检查：`https://你的域名/api/health`
-- 数据表与统计函数：在 Supabase SQL Editor 中执行一次 `migrations/0001_supabase.sql`
+- 数据表与统计函数：按编号顺序执行 `migrations/` 中的全部 SQL 文件
 
 生产环境不会使用临时内存存储。如果 Supabase 未配置，询价与后台接口会返回 503，避免数据看似提交成功却实际丢失。
 
@@ -19,6 +19,7 @@
 - `ADMIN_USERNAME`：管理员账号
 - `ADMIN_PASSWORD`：高强度管理员密码，建议至少 16 位
 - `ADMIN_SESSION_SECRET`：不少于 32 字节的随机字符串
+- `IP_HASH_SECRET`：不少于 32 字节的独立随机字符串，用于不可逆限流指纹
 - `NEXT_PUBLIC_SITE_URL`：正式 HTTPS 域名，例如 `https://example.com`
 - `NEXT_PUBLIC_COMPANY_NAME`：真实法律主体名称
 - `NEXT_PUBLIC_COMPANY_REGISTRATION`：注册号或统一识别号
@@ -43,7 +44,7 @@
 
 ## 上线前验收
 
-1. 在 Supabase SQL Editor 中执行 `migrations/0001_supabase.sql`。
+1. 在 Supabase SQL Editor 中依次执行 `migrations/0001_supabase.sql` 和 `migrations/0002_backend_hardening.sql`。
 2. 在 Vercel 中配置上述生产环境变量后重新部署。
 3. 打开 `/api/health`，确认返回 `database: "supabase"`。
 4. 打开 `/admin`，使用生产管理员账号登录。
@@ -52,3 +53,19 @@
 7. 检查自定义域名 HTTPS、DNS 和 `NEXT_PUBLIC_SITE_URL`。
 8. 在公司信息页补充真实运营主体、注册地址、注册号、商务邮箱和隐私联系方式。
 9. 如业务覆盖多个国家或地区，请让当地法律顾问确认隐私告知、Cookie、跨境数据和营销联系要求。
+
+## 数据保留与审计
+
+- `request_limits` 会在限流 RPC 执行时自动删除 24 小时前的记录。
+- `cleanup_backend_data()` 默认删除 400 天前的匿名分析事件和 24 小时前的限流记录。建议在 Supabase Cron 中每天执行一次：`select * from public.cleanup_backend_data();`。
+- 询价属于业务记录，不会被自动删除；应根据公司合同、税务和隐私政策另行确定保留期限。
+- 管理员修改询价状态后，变更前后状态、管理员账号和时间会写入 `inquiry_status_history`。
+
+## 生产监控
+
+API 错误日志采用单行 JSON，包含事件名、请求编号和时间。建议为 Vercel 配置日志汇聚与告警，并至少监控：
+
+- `/api/health` 连续返回 503；
+- `inquiry.create`、`notification delivery failed` 和 `admin.login` 异常增长；
+- Supabase 数据库容量、API 延迟和连接数；
+- 每日询价数量异常归零或突然激增。

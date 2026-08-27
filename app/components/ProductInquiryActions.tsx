@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { BASE_PATH } from "../base-path";
 import { buildPhoneHref, buildWhatsappHref, customerServiceCopy, type ContactMethod, type SiteLanguage } from "../customer-service";
 import { formatUnitCurrency, type Currency } from "../currency";
@@ -69,6 +69,7 @@ export default function ProductInquiryActions({ lang, product, currency }: Props
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const idempotencyKey = useRef("");
   const message = `${service.manager}: ${product.name} × ${quantity}`;
   const whatsappHref = buildWhatsappHref(message);
   const phoneHref = buildPhoneHref();
@@ -88,10 +89,11 @@ export default function ProductInquiryActions({ lang, product, currency }: Props
     setSubmitError("");
     try {
       const context = getClientContext();
+      idempotencyKey.current ||= crypto.randomUUID();
       const phone = `${String(data.get("phoneCountryCode") ?? "")} ${String(data.get("phone") ?? "")}`.trim();
       const response = await fetch("/api/inquiries", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "idempotency-key": idempotencyKey.current },
         body: JSON.stringify({
           ...context,
           website: data.get("website"),
@@ -109,6 +111,7 @@ export default function ProductInquiryActions({ lang, product, currency }: Props
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Inquiry submission failed");
       setSubmitted(true);
+      idempotencyKey.current = "";
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : "Inquiry submission failed");
     } finally {
