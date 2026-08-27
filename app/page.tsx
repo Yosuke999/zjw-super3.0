@@ -10,6 +10,8 @@ import { kyrgyzProductNames } from "./product-localization";
 import CustomerServiceDock from "./components/CustomerServiceDock";
 import { customerServiceCopy, type ContactMethod } from "./customer-service";
 import { getClientContext } from "./lib/analytics-client";
+import inquiryCopy from "./content/inquiry-copy.json";
+import logisticsNews from "./content/logistics-news.json";
 
 type Lang = "ru" | "ky" | "uz" | "zh";
 type CategoryId = "home" | "fashion" | "tools" | "digital" | "auto" | "beauty";
@@ -131,56 +133,6 @@ const copy = {
   },
 } as const;
 
-const inquiryCopy = {
-  ru: {
-    add: "Добавить в запрос", added: "Добавлено", list: "Запрос", title: "Получить точную цену с доставкой",
-    subtitle: "Выберите количество и оставьте номер — менеджер уточнит закупочную цену, доставку и расходы.", empty: "Добавьте товары, чтобы получить расчёт.",
-    quantity: "Количество", remove: "Удалить", destination: "Город доставки", phone: "Контактный телефон", whatsapp: "WhatsApp",
-    sameWhatsapp: "WhatsApp совпадает с контактным телефоном", email: "Эл. почта", emailHint: "Для получения полного коммерческого предложения",
-    preferred: "Предпочтительный способ связи", phoneFirst: "Телефон", whatsappFirst: "WhatsApp", emailFirst: "Почта", note: "Комментарий",
-    notePlaceholder: "Нужные модели, цвета, сроки или другие пожелания", submit: "Отправить запрос и ждать звонка",
-    response: "В рабочее время свяжемся с вами в течение 30 минут.", free: "Бесплатный расчёт · без обязательства заказывать",
-    success: "Запрос отправлен. Мы свяжемся с вами по телефону.", close: "Закрыть", exchange: "Ориентировочный курс",
-    subtotal: "Стоимость товаров", rate: "Курс пересчёта", excluded: "Не включено в сумму",
-    excludedDetail: "Доставка, налоги и сервисный сбор будут указаны после ручного расчёта.",
-  },
-  ky: {
-    add: "Сурамга кошуу", added: "Кошулду", list: "Сурам", title: "Жеткирүү менен так бааны алыңыз",
-    subtitle: "Санын тандап, телефон номериңизди калтырыңыз — адис өнүмдү, жеткирүүнү жана чыгымдарды эсептейт.", empty: "Эсептөө үчүн өнүмдөрдү кошуңуз.",
-    quantity: "Саны", remove: "Өчүрүү", destination: "Жеткирүү шаары", phone: "Байланыш телефону", whatsapp: "WhatsApp",
-    sameWhatsapp: "WhatsApp номери байланыш телефону менен бирдей", email: "Электрондук дарек", emailHint: "Толук сунушту алуу үчүн",
-    preferred: "Байланыштын ыңгайлуу жолу", phoneFirst: "Телефон", whatsappFirst: "WhatsApp", emailFirst: "Электрондук дарек", note: "Кошумча маалымат",
-    notePlaceholder: "Модель, түс, мөөнөт же башка каалоолор", submit: "Сурам жөнөтүп, чалууну күтүү",
-    response: "Иш убактысында 30 мүнөттүн ичинде байланышабыз.", free: "Акысыз эсеп · сатып алуу милдеттүү эмес",
-    success: "Сурам жөнөтүлдү. Биз сизге телефон аркылуу байланышабыз.", close: "Жабуу", exchange: "Болжолдуу курс",
-    subtotal: "Товардын суммасы", rate: "Эсептөө курсу", excluded: "Суммага кирген жок",
-    excludedDetail: "Жеткирүү, салыктар жана тейлөө акысы кол менен эсептелгенден кийин көрсөтүлөт.",
-  },
-  uz: {
-    add: "So‘rovga qo‘shish", added: "Qo‘shildi", list: "So‘rov", title: "Yetkazib berish bilan aniq narxni oling",
-    subtitle: "Miqdorni tanlang va telefon raqamingizni qoldiring — menejer mahsulot, yetkazish va xarajatlarni hisoblaydi.", empty: "Hisob-kitob olish uchun mahsulot qo‘shing.",
-    quantity: "Miqdor", remove: "O‘chirish", destination: "Yetkazib berish shahri", phone: "Aloqa telefoni", whatsapp: "WhatsApp",
-    sameWhatsapp: "WhatsApp raqami aloqa telefoni bilan bir xil", email: "E-pochta", emailHint: "To‘liq tijorat taklifini olish uchun",
-    preferred: "Afzal aloqa usuli", phoneFirst: "Telefon", whatsappFirst: "WhatsApp", emailFirst: "E-pochta", note: "Izoh",
-    notePlaceholder: "Model, rang, muddat yoki boshqa istaklar", submit: "So‘rov yuborish va qo‘ng‘iroqni kutish",
-    response: "Ish vaqtida 30 daqiqa ichida bog‘lanamiz.", free: "Bepul hisob-kitob · buyurtma majburiy emas",
-    success: "So‘rov yuborildi. Siz bilan telefon orqali bog‘lanamiz.", close: "Yopish", exchange: "Taxminiy kurs",
-    subtotal: "Mahsulotlar summasi", rate: "Hisoblash kursi", excluded: "Summaga kiritilmagan",
-    excludedDetail: "Yetkazish, soliqlar va xizmat haqi qo‘lda hisoblangandan keyin ko‘rsatiladi.",
-  },
-  zh: {
-    add: "加入询价单", added: "已加入", list: "询价单", title: "获取准确到货价",
-    subtitle: "选择采购数量并留下电话，采购经理将核算商品、物流及相关费用。", empty: "添加商品后即可获取采购报价。",
-    quantity: "采购数量", remove: "删除", destination: "收货城市", phone: "联系电话", whatsapp: "WhatsApp",
-    sameWhatsapp: "WhatsApp 与联系电话相同", email: "邮箱", emailHint: "用于接收完整报价单",
-    preferred: "优先联系方式", phoneFirst: "电话优先", whatsappFirst: "WhatsApp", emailFirst: "邮箱", note: "备注",
-    notePlaceholder: "需要的型号、颜色、交期或其他要求", submit: "提交询价，等待电话联系",
-    response: "工作时间内，我们将在 30 分钟内与您联系。", free: "免费报价 · 不产生订购义务",
-    success: "询价已提交，我们会优先通过电话与您联系。", close: "关闭", exchange: "参考汇率换算",
-    subtotal: "商品小计", rate: "参考汇率", excluded: "暂未计入",
-    excludedDetail: "物流、税费及服务费将在人工核价后单独列明。",
-  },
-} as const;
 
 const siteCopy = {
   ru: {
@@ -258,134 +210,6 @@ const newsCopy = {
   },
 } as const;
 
-const logisticsNews = [
-  {
-    id: "border-logistics", date: "2026-07-30", image: "/news/torugart-crossing.jpg",
-    sourceUrl: "https://gov.uz/ru/minenergy/news/view/200002",
-    photoUrl: "https://commons.wikimedia.org/wiki/File:Torugartcrossing.jpg",
-    tag: { ru: "ГРАНИЦА", ky: "ЧЕК АРА", uz: "CHEGARA", zh: "口岸" },
-    title: {
-      ru: "Узбекистан и Кыргызстан усилят инфраструктуру вдоль железной дороги",
-      ky: "Өзбекстан менен Кыргызстан темир жол боюндагы инфраструктураны күчөтөт",
-      uz: "O‘zbekiston va Qirg‘iziston temir yo‘l bo‘yi infratuzilmasini rivojlantiradi",
-      zh: "乌吉将推进铁路沿线口岸与商贸物流设施",
-    },
-    summary: {
-      ru: "Стороны договорились развивать пограничную и торгово-логистическую инфраструктуру, цифровизировать разрешительные процедуры и улучшать условия для автоперевозчиков.",
-      ky: "Тараптар чек ара жана соода-логистикалык инфраструктураны өнүктүрүү, уруксат берүү жол-жоболорун санариптештирүү жана автоташуучулар үчүн шарттарды жакшыртуу боюнча макулдашты.",
-      uz: "Tomonlar chegara va savdo-logistika infratuzilmasini rivojlantirish, ruxsat berish jarayonlarini raqamlashtirish va avtomobil tashuvchilari uchun sharoitlarni yaxshilashga kelishdi.",
-      zh: "双方同意发展铁路沿线口岸和商贸物流基础设施，推动许可手续数字化，并改善公路承运人的通行条件。",
-    },
-    sourceName: { ru: "Правительственный портал Узбекистана", ky: "Өзбекстан Өкмөтүнүн порталы", uz: "O‘zbekiston Hukumat portali", zh: "乌兹别克斯坦政府门户网站" },
-    photoCaption: { ru: "Погранпереход Торугарт, Кыргызстан — Китай", ky: "Торугарт чек ара өткөрмө пункту, Кыргызстан — Кытай", uz: "Torugart chegara o‘tish punkti, Qirg‘iziston — Xitoy", zh: "吐尔尕特中吉边境口岸实景" },
-    photoCredit: { ru: "Alexdejoyeuse · общественное достояние / Wikimedia Commons", ky: "Alexdejoyeuse · коомдук домен / Wikimedia Commons", uz: "Alexdejoyeuse · jamoat mulki / Wikimedia Commons", zh: "Alexdejoyeuse · 公有领域 / Wikimedia Commons" },
-  },
-  {
-    id: "railway-schedule", date: "2026-07-15", image: "/news/balykchy-aerial.jpg",
-    sourceUrl: "https://gov.uz/ru/mintrans/news/view/193833",
-    photoUrl: "https://commons.wikimedia.org/wiki/File:%D0%91%D0%B0%D0%BB%D1%8B%D0%BA%D1%87%D1%8B,_%D1%81%D1%82%D0%B0%D0%BD%D1%86%D0%B8%D1%8F_%D1%81%D0%B2%D0%B5%D1%80%D1%85%D1%83_(1).jpg",
-    tag: { ru: "СТРОЙКА", ky: "КУРУЛУШ", uz: "QURILISH", zh: "建设" },
-    title: {
-      ru: "Работы на железной дороге Китай — Кыргызстан — Узбекистан идут по графику",
-      ky: "Кытай — Кыргызстан — Өзбекстан темир жолунун курулушу график боюнча жүрүүдө",
-      uz: "Xitoy — Qirg‘iziston — O‘zbekiston temir yo‘li ishlari jadval bo‘yicha ketmoqda",
-      zh: "中吉乌铁路建设按既定计划推进",
-    },
-    summary: {
-      ru: "На встрече транспортных ведомств подтверждено соблюдение графика. Также обсуждались мультимодальный коридор и возможность экспортного статуса для пограничной станции Кашгар.",
-      ky: "Транспорт мекемелеринин жолугушуусунда курулуш графиги сакталганы белгиленди. Көп түрдүү ташуу коридору жана Кашгар чек ара станциясына экспорттук макам берүү да талкууланды.",
-      uz: "Transport idoralari uchrashuvida qurilish jadvaliga rioya qilinayotgani qayd etildi. Multimodal yo‘lak va Qashg‘ar chegara stansiyasiga eksport maqomi berish masalasi ham muhokama qilindi.",
-      zh: "交通部门会谈确认工程按计划推进，同时讨论提升中吉乌多式联运通道吸引力，以及研究赋予喀什边境站“出口站”地位。",
-    },
-    sourceName: { ru: "Министерство транспорта Узбекистана", ky: "Өзбекстандын Транспорт министрлиги", uz: "O‘zbekiston Transport vazirligi", zh: "乌兹别克斯坦交通部" },
-    photoCaption: { ru: "Железнодорожная станция Балыкчы, Кыргызстан", ky: "Балыкчы темир жол станциясы, Кыргызстан", uz: "Baliqchi temir yo‘l stansiyasi, Qirg‘iziston", zh: "吉尔吉斯斯坦巴雷克奇铁路站实景" },
-    photoCredit: { ru: "Nikolai Bulykin · лицензия CC BY-SA 4.0 / Wikimedia Commons", ky: "Nikolai Bulykin · CC BY-SA 4.0 лицензиясы / Wikimedia Commons", uz: "Nikolai Bulykin · CC BY-SA 4.0 litsenziyasi / Wikimedia Commons", zh: "Nikolai Bulykin · CC BY-SA 4.0 授权 / Wikimedia Commons" },
-  },
-  {
-    id: "south-transit", date: "2026-07-07", image: "/news/uzbekistan-freight-train.jpg",
-    sourceUrl: "https://gov.uz/ru/mintrans/news/view/189129",
-    photoUrl: "https://commons.wikimedia.org/wiki/File:OTY_2O%27Z_UY_Tangimush_-_Pulhokim.jpg",
-    tag: { ru: "ГРУЗЫ", ky: "ЖҮК", uz: "YUK", zh: "货运" },
-    title: {
-      ru: "Южный транзит через Узбекистан вырос на 23%",
-      ky: "Өзбекстан аркылуу түштүк транзити 23% өстү",
-      uz: "O‘zbekiston orqali janubiy tranzit 23 foizga oshdi",
-      zh: "乌兹别克斯坦南向过境货运增长 23%",
-    },
-    summary: {
-      ru: "В первом квартале 2026 года южный транзит достиг 1,8 млн тонн: 1,3 млн тонн перевезено по железной дороге и 0,5 млн тонн автотранспортом.",
-      ky: "2026-жылдын биринчи чейрегинде түштүк багытындагы транзит 1,8 млн тоннага жетти: 1,3 млн тоннасы темир жол, 0,5 млн тоннасы автоунаа менен ташылды.",
-      uz: "2026-yil birinchi choragida janubiy tranzit 1,8 mln tonnaga yetdi: 1,3 mln tonna temir yo‘l, 0,5 mln tonna avtomobil transporti hissasiga to‘g‘ri keldi.",
-      zh: "2026 年第一季度南向过境货运达到 180 万吨，其中铁路 130 万吨、公路 50 万吨。",
-    },
-    sourceName: { ru: "Министерство транспорта Узбекистана", ky: "Өзбекстандын Транспорт министрлиги", uz: "O‘zbekiston Transport vazirligi", zh: "乌兹别克斯坦交通部" },
-    photoCaption: { ru: "Грузовой поезд между Тангимушем и Пулхокимом, Узбекистан", ky: "Өзбекстандагы Тангимуш — Пулхоким жүк поезди", uz: "Tangimush va Pulhokim oralig‘idagi yuk poyezdi, O‘zbekiston", zh: "乌兹别克斯坦唐吉穆什—普尔霍基姆区间货运列车" },
-    photoCredit: { ru: "Kabelleger · лицензия CC BY-SA 4.0 / Wikimedia Commons", ky: "Kabelleger · CC BY-SA 4.0 лицензиясы / Wikimedia Commons", uz: "Kabelleger · CC BY-SA 4.0 litsenziyasi / Wikimedia Commons", zh: "Kabelleger · CC BY-SA 4.0 授权 / Wikimedia Commons" },
-  },
-  {
-    id: "e-logistics", date: "2026-06-24", image: "/news/kant-station.jpg",
-    sourceUrl: "https://gov.uz/en/imv/news/view/183443",
-    photoUrl: "https://commons.wikimedia.org/wiki/File:Kant_near_Bishkek_03-2016_img03_railway_station.jpg",
-    tag: { ru: "ЦИФРОВОЕ", ky: "САНАРИП", uz: "RAQAMLI", zh: "数字化" },
-    title: {
-      ru: "Узбекистан готовит единую платформу E-Logistics",
-      ky: "Өзбекстан бирдиктүү E-Logistics платформасын даярдоодо",
-      uz: "O‘zbekiston yagona E-Logistics platformasini tayyorlamoqda",
-      zh: "乌兹别克斯坦推进统一 E‑Logistics 平台",
-    },
-    summary: {
-      ru: "Проект предусматривает электронные грузовые документы, автоматический обмен данными с таможней и транспортным контролем, а также сквозное отслеживание доставки.",
-      ky: "Долбоор жүк документтерин электрондук форматка өткөрүүнү, бажы жана транспорт көзөмөлү менен автоматтык маалымат алмашууну, ошондой эле жеткирүүнү толук көзөмөлдөөнү карайт.",
-      uz: "Loyiha yuk hujjatlarini elektronlashtirish, bojxona va transport nazorati bilan avtomatik ma’lumot almashish hamda yetkazib berishni boshidan oxirigacha kuzatishni nazarda tutadi.",
-      zh: "项目计划将货运文件电子化，与海关和运输监管机构自动交换数据，并对货物从起运到交付进行全流程跟踪。",
-    },
-    sourceName: { ru: "Портал Министерства экономики и финансов", ky: "Экономика жана финансы министрлигинин порталы", uz: "Iqtisodiyot va moliya vazirligi portali", zh: "乌兹别克斯坦经济财政部门门户网站" },
-    photoCaption: { ru: "Железнодорожная станция Кант, Кыргызстан", ky: "Кант темир жол станциясы, Кыргызстан", uz: "Kant temir yo‘l stansiyasi, Qirg‘iziston", zh: "吉尔吉斯斯坦坎特铁路站实景" },
-    photoCredit: { ru: "A.Savin, Wikipedia · свободная лицензия Art Libre / Wikimedia Commons", ky: "A.Savin, Wikipedia · Art Libre эркин лицензиясы / Wikimedia Commons", uz: "A.Savin, Wikipedia · Art Libre erkin litsenziyasi / Wikimedia Commons", zh: "A.Savin, Wikipedia · Art Libre 自由艺术许可 / Wikimedia Commons" },
-  },
-  {
-    id: "middle-corridor", date: "2026-05-15", image: "/news/torugart-road.jpg",
-    sourceUrl: "https://gov.uz/en/mfa/news/view/166841",
-    photoUrl: "https://commons.wikimedia.org/wiki/File:2015-09-09-092043_-_Zum_Torugart-Pass.jpg",
-    tag: { ru: "КОРИДОР", ky: "КОРИДОР", uz: "YO‘LAK", zh: "通道" },
-    title: {
-      ru: "Средний коридор планируют связать с новой железной дорогой",
-      ky: "Орто коридорду жаңы темир жол менен байланыштыруу пландалууда",
-      uz: "O‘rta yo‘lakni yangi temir yo‘l bilan bog‘lash rejalashtirilmoqda",
-      zh: "中间走廊拟与中吉乌铁路衔接",
-    },
-    summary: {
-      ru: "На саммите тюркских государств обозначены задачи по соединению Среднего коридора со строящейся железной дорогой и полной цифровизации обмена таможенными данными.",
-      ky: "Түрк мамлекеттеринин саммитинде Орто коридорду курулуп жаткан темир жолго туташтыруу жана бажы маалыматтарын толук санарип алмашуу милдеттери белгиленди.",
-      uz: "Turkiy davlatlar sammitida O‘rta yo‘lakni qurilayotgan temir yo‘lga ulash va bojxona ma’lumotlari almashinuvini to‘liq raqamlashtirish vazifalari belgilandi.",
-      zh: "突厥国家组织峰会提出，将中间走廊与在建中吉乌铁路衔接，并推动海关数据交换全面数字化。",
-    },
-    sourceName: { ru: "Правительственный портал Узбекистана", ky: "Өзбекстан Өкмөтүнүн порталы", uz: "O‘zbekiston Hukumat portali", zh: "乌兹别克斯坦政府门户网站" },
-    photoCaption: { ru: "Автодорога к перевалу Торугарт, Кыргызстан", ky: "Торугарт ашуусуна кеткен жол, Кыргызстан", uz: "Torugart dovoniga olib boruvchi yo‘l, Qirg‘iziston", zh: "吉尔吉斯斯坦通往吐尔尕特山口的公路实景" },
-    photoCredit: { ru: "Zossolino · лицензия CC BY-SA 4.0 / Wikimedia Commons", ky: "Zossolino · CC BY-SA 4.0 лицензиясы / Wikimedia Commons", uz: "Zossolino · CC BY-SA 4.0 litsenziyasi / Wikimedia Commons", zh: "Zossolino · CC BY-SA 4.0 授权 / Wikimedia Commons" },
-  },
-  {
-    id: "freight-cars", date: "2026-02-26", image: "/news/balykchy-station.jpg",
-    sourceUrl: "https://gov.uz/en/news/view/136854",
-    photoUrl: "https://commons.wikimedia.org/wiki/File:Balykchy_railway_station.jpg",
-    tag: { ru: "ВАГОНЫ", ky: "ВАГОН", uz: "VAGON", zh: "运力" },
-    title: {
-      ru: "Узбекистан расширяет парк грузовых вагонов",
-      ky: "Өзбекстан жүк вагондорунун паркын кеңейтүүдө",
-      uz: "O‘zbekiston yuk vagonlari parkini kengaytirmoqda",
-      zh: "乌兹别克斯坦扩大铁路货车运力",
-    },
-    summary: {
-      ru: "На 2026 год поставлена задача довести выпуск до 2 000 грузовых вагонов. Дополнительное финансирование должно обеспечить поставку ещё 1 350 вагонов.",
-      ky: "2026-жылы жүк вагондорун чыгарууну 2 000 даанага жеткирүү милдети коюлду. Кошумча каржылоо дагы 1 350 вагон жеткирүүгө багытталат.",
-      uz: "2026-yilda yuk vagonlari ishlab chiqarishni 2 000 donaga yetkazish vazifasi qo‘yildi. Qo‘shimcha moliyalashtirish yana 1 350 vagon yetkazib berishni ta’minlaydi.",
-      zh: "2026 年铁路货车产能目标提高至 2,000 辆，新增资金将用于保障再供应 1,350 辆货车。",
-    },
-    sourceName: { ru: "Правительственный портал Узбекистана", ky: "Өзбекстан Өкмөтүнүн порталы", uz: "O‘zbekiston Hukumat portali", zh: "乌兹别克斯坦政府门户网站" },
-    photoCaption: { ru: "Железнодорожная станция Балыкчы, Кыргызстан", ky: "Балыкчы темир жол станциясы, Кыргызстан", uz: "Baliqchi temir yo‘l stansiyasi, Qirg‘iziston", zh: "吉尔吉斯斯坦巴雷克奇铁路站实景" },
-    photoCredit: { ru: "Robert-Antonio · лицензия CC BY-SA 3.0 / Wikimedia Commons", ky: "Robert-Antonio · CC BY-SA 3.0 лицензиясы / Wikimedia Commons", uz: "Robert-Antonio · CC BY-SA 3.0 litsenziyasi / Wikimedia Commons", zh: "Robert-Antonio · CC BY-SA 3.0 授权 / Wikimedia Commons" },
-  },
-] as const;
 
 const processCopy = {
   ru: {
@@ -510,40 +334,7 @@ function supportsPreciseHover() {
   return typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 }
 
-const productName = (ru: string, uz: string, zh: string) => ({ ru, ky: ru, uz, zh });
-
-const products = [
-  { name: productName("Защитное стекло для смартфона", "Telefon uchun himoya oynasi", "手机钢化膜"), image: "/products/01-tempered-glass-screen-protectors.jpg", cost: "¥ 0.45", retail: { kg: "120 сом", uz: "17 000 so‘m" }, moq: 500, orders: 2358, kind: "screen-protector" },
-  { name: productName("Прозрачный противоударный чехол", "Shaffof zarbaga chidamli g‘ilof", "透明防摔手机壳"), image: "/products/02-clear-shockproof-phone-case.jpg", cost: "¥ 2.80", retail: { kg: "350 сом", uz: "49 000 so‘m" }, moq: 100, orders: 1846, kind: "phone-case" },
-  { name: productName("Плетёный кабель быстрой зарядки USB-C", "O‘ralgan USB-C tezkor quvvat kabeli", "编织USB-C快充线"), image: "/products/03-braided-usb-c-fast-charge-cable.jpg", cost: "¥ 5.60", retail: { kg: "550 сом", uz: "75 000 so‘m" }, moq: 100, orders: 1527, kind: "usb-c-cable" },
-  { name: productName("Складная настольная подставка", "Buklanadigan stol telefon tagligi", "折叠桌面手机支架"), image: "/products/04-folding-desktop-phone-stand.jpg", cost: "¥ 3.20", retail: { kg: "350 сом", uz: "49 000 so‘m" }, moq: 100, orders: 1326, kind: "phone-stand" },
-  { name: productName("Автомобильный держатель на дефлектор", "Avtomobil havo panjarasi telefon ushlagichi", "车载出风口手机支架"), image: "/products/05-car-air-vent-phone-holder.jpg", cost: "¥ 6.80", retail: { kg: "650 сом", uz: "89 000 so‘m" }, moq: 100, orders: 1098, kind: "car-holder" },
-  { name: productName("Селфи-палка со штативом", "Tripodli selfi tayoqchasi", "自拍杆三脚架"), image: "/products/06-selfie-stick-tripod.jpg", cost: "¥ 11.50", retail: { kg: "1 200 сом", uz: "165 000 so‘m" }, moq: 50, orders: 987, kind: "selfie-stick" },
-  { name: productName("Набор защиты и органайзеров для кабеля", "Kabel himoyasi va tartiblagich to‘plami", "数据线保护整理套装"), image: "/products/07-cable-protector-organizer-set.jpg", cost: "¥ 1.80", retail: { kg: "250 сом", uz: "35 000 so‘m" }, moq: 200, orders: 1642, kind: "cable-organizer" },
-  { name: productName("Заколки-крабы и резинки для волос", "Soch qisqichi va rezinka to‘plami", "抓夹发圈组合"), image: "/products/08-hair-claw-and-hair-tie-set.jpg", cost: "¥ 4.20", retail: { kg: "450 сом", uz: "62 000 so‘m" }, moq: 100, orders: 1435, kind: "hair-set" },
-  { name: productName("Спонжи и пуховки для макияжа", "Makiyaj gubkasi va puff to‘plami", "美妆蛋粉扑套装"), image: "/products/09-makeup-sponge-and-puff-set.jpg", cost: "¥ 3.80", retail: { kg: "420 сом", uz: "58 000 so‘m" }, moq: 100, orders: 1719, kind: "makeup-sponge" },
-  { name: productName("Лента для завивки без нагрева", "Issiqliksiz soch jingalak lentasi", "免热卷发带套装"), image: "/products/10-heatless-curling-ribbon-set.jpg", cost: "¥ 3.50", retail: { kg: "390 сом", uz: "54 000 so‘m" }, moq: 100, orders: 1268, kind: "curling-ribbon" },
-  { name: productName("Наклейки и накладные ногти", "Tirnoq stikerlari va sun’iy tirnoqlar", "美甲贴片甲套装"), image: "/products/11-nail-stickers-and-press-on-nails.jpg", cost: "¥ 2.90", retail: { kg: "350 сом", uz: "48 000 so‘m" }, moq: 200, orders: 1883, kind: "nail-set" },
-  { name: productName("Магнитные застёжки и броши для платка", "Ro‘mol uchun magnit qisqich va brosh", "围巾磁扣胸针套装"), image: "/products/12-scarf-magnetic-clasps-and-brooches.jpg", cost: "¥ 3.20", retail: { kg: "380 сом", uz: "52 000 so‘m" }, moq: 100, orders: 932, kind: "scarf-clasp" },
-  { name: productName("Дорожная шкатулка для украшений", "Sayohat zargarlik qutisi", "旅行首饰盒"), image: "/products/13-travel-jewelry-box-and-roll.jpg", cost: "¥ 12.80", retail: { kg: "1 300 сом", uz: "180 000 so‘m" }, moq: 50, orders: 864, kind: "jewelry-box" },
-  { name: productName("Самоклеящиеся крючки без сверления", "Teshmasdan yopishtiriladigan ilgaklar", "免打孔粘钩套装"), image: "/products/14-no-drill-adhesive-hook-set.jpg", cost: "¥ 3.60", retail: { kg: "420 сом", uz: "58 000 so‘m" }, moq: 100, orders: 1496, kind: "adhesive-hooks" },
-  { name: productName("Набор ситечек для слива", "Drenaj filtri to‘plami", "下水口过滤网套装"), image: "/products/15-drain-strainer-set.jpg", cost: "¥ 4.80", retail: { kg: "520 сом", uz: "72 000 so‘m" }, moq: 100, orders: 1107, kind: "drain-strainer" },
-  { name: productName("Набор вакуумных пакетов", "Vakuum siqish paketlari", "真空压缩袋套装"), image: "/products/16-vacuum-compression-bag-set.jpg", cost: "¥ 15.50", retail: { kg: "1 550 сом", uz: "215 000 so‘m" }, moq: 30, orders: 1254, kind: "vacuum-bags" },
-  { name: productName("Разделители и органайзер для белья", "Tortma ajratgich va ichki kiyim tartiblagichi", "抽屉分隔内衣收纳盒"), image: "/products/17-drawer-divider-and-underwear-organizer.jpg", cost: "¥ 9.80", retail: { kg: "980 сом", uz: "136 000 so‘m" }, moq: 50, orders: 876, kind: "drawer-organizer" },
-  { name: productName("Чехлы для обуви и дорожные органайзеры", "Poyabzal qopi va sayohat tartiblagichi", "鞋子防尘旅行收纳袋"), image: "/products/18-shoe-dust-bag-and-travel-organizer-set.jpg", cost: "¥ 13.60", retail: { kg: "1 350 сом", uz: "188 000 so‘m" }, moq: 50, orders: 798, kind: "travel-organizer" },
-  { name: productName("Силиконовые планки для зазоров", "Rakovina va plita uchun silikon tirqish tasmasi", "水槽灶台缝隙条"), image: "/products/19-silicone-sink-and-stove-gap-strips.jpg", cost: "¥ 5.20", retail: { kg: "590 сом", uz: "82 000 so‘m" }, moq: 100, orders: 1034, kind: "gap-strip" },
-  { name: productName("Салфетки из микрофибры для автомобиля", "Avtomobil uchun mikrofiber sochiqlar", "汽车超细纤维毛巾套装"), image: "/products/20-car-microfiber-towel-set.jpg", cost: "¥ 6.30", retail: { kg: "720 сом", uz: "99 000 so‘m" }, moq: 100, orders: 1186, kind: "car-towels" },
-  { name: productName("Органайзеры в щель автомобильного сиденья", "Avtomobil o‘rindig‘i oralig‘i organayzeri", "汽车座椅缝隙收纳盒"), image: "/products/21-car-seat-gap-filler-and-storage-boxes.jpg", cost: "¥ 18.50", retail: { kg: "1 850 сом", uz: "255 000 so‘m" }, moq: 30, orders: 694, kind: "seat-organizer" },
-  { name: productName("Складной зонт-шторка на лобовое стекло", "Buklanadigan old oyna soyabon soyasi", "折叠式汽车遮阳伞"), image: "/products/22-folding-windshield-sunshade-umbrella.jpg", cost: "¥ 16.80", retail: { kg: "1 680 сом", uz: "235 000 so‘m" }, moq: 30, orders: 905, kind: "sunshade" },
-  { name: productName("Зимний чехол на лобовое стекло", "Old oyna uchun qor va muz qopqog‘i", "汽车挡风玻璃防雪罩"), image: "/products/23-windshield-snow-frost-cover.jpg", cost: "¥ 21.50", retail: { kg: "2 100 сом", uz: "295 000 so‘m" }, moq: 30, orders: 642, kind: "frost-cover" },
-  { name: productName("Нарукавники и маска от солнца", "UV qo‘l yenglari va yuz niqobi", "防晒冰袖面罩套装"), image: "/products/24-uv-arm-sleeves-and-face-cover.jpg", cost: "¥ 5.90", retail: { kg: "650 сом", uz: "90 000 so‘m" }, moq: 100, orders: 1378, kind: "uv-set" },
-  { name: productName("Зимние перчатки для сенсорного экрана", "Sensorli ekran uchun qishki qo‘lqop", "触屏保暖手套"), image: "/products/25-touchscreen-winter-gloves.jpg", cost: "¥ 8.80", retail: { kg: "890 сом", uz: "125 000 so‘m" }, moq: 100, orders: 1594, kind: "winter-gloves" },
-  { name: productName("Машинка для удаления катышков USB-C", "USB-C tuk tozalagich", "USB-C充电毛球修剪器"), image: "/products/26-usb-c-lint-remover.jpg", cost: "¥ 17.80", retail: { kg: "1 750 сом", uz: "245 000 so‘m" }, moq: 30, orders: 763, kind: "lint-remover" },
-  { name: productName("Мини-запайщик пакетов USB-C", "USB-C mini paket yopishtirgich", "USB-C迷你封口机"), image: "/products/27-usb-c-mini-bag-sealer.jpg", cost: "¥ 9.60", retail: { kg: "980 сом", uz: "136 000 so‘m" }, moq: 50, orders: 1129, kind: "bag-sealer" },
-  { name: productName("Ручной настольный вентилятор USB-C", "Qo‘l va stol uchun USB-C ventilyator", "USB-C手持桌面风扇"), image: "/products/28-handheld-tabletop-usb-c-fan.jpg", cost: "¥ 18.50", retail: { kg: "1 850 сом", uz: "255 000 so‘m" }, moq: 30, orders: 821, kind: "usb-fan" },
-  { name: productName("Магнитный светильник с датчиком движения", "Harakat sensorli magnit shkaf chirog‘i", "人体感应磁吸柜灯"), image: "/products/29-motion-sensor-magnetic-cabinet-light.jpg", cost: "¥ 15.80", retail: { kg: "1 580 сом", uz: "218 000 so‘m" }, moq: 30, orders: 746, kind: "sensor-light" },
-  { name: productName("PTC-сушилка для обуви", "PTC poyabzal quritgichi", "PTC恒温烘鞋器"), image: "/products/30-ptc-shoe-dryer.jpg", cost: "¥ 28.50", retail: { kg: "2 850 сом", uz: "395 000 so‘m" }, moq: 20, orders: 584, kind: "shoe-dryer" },
-];
+const products = catalogProducts;
 
 const heroProductKinds = ["phone-case", "screen-protector", "bag-sealer"] as const;
 const productBadgeByKind = new Map(catalogProducts.map((product) => [product.kind, product.badge]));
