@@ -189,22 +189,25 @@ export default function AdminApp() {
   const [days, setDays] = useState(30);
   const [status, setStatus] = useState<InquiryStatus | "all">("all");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [selectedInquiry, setSelectedInquiry] = useState<InquiryRecord | null>(null);
 
-  const load = useCallback(async (options?: { days?: number; status?: InquiryStatus | "all"; search?: string }) => {
+  const load = useCallback(async (options?: { days?: number; status?: InquiryStatus | "all"; search?: string; page?: number }) => {
     setLoading(true);
     setError("");
     const nextDays = options?.days ?? days;
     const nextStatus = options?.status ?? status;
     const nextSearch = options?.search ?? search;
+    const nextPage = options?.page ?? page;
     try {
-      const parameters = new URLSearchParams({ days: String(nextDays), status: nextStatus, search: nextSearch });
+      const parameters = new URLSearchParams({ days: String(nextDays), status: nextStatus, search: nextSearch, page: String(nextPage), pageSize: "50" });
       const response = await fetch(`/api/admin/dashboard?${parameters}`, { cache: "no-store" });
       const result = await response.json() as { error?: string; user?: { username: string }; snapshot?: AdminSnapshot };
       if (response.status === 401) { setAuthState("signed-out"); setSnapshot(null); return; }
       if (!response.ok || !result.snapshot) throw new Error(result.error ?? "后台数据加载失败");
       setUsername(result.user?.username ?? "管理员");
       setSnapshot(result.snapshot);
+      setPage(result.snapshot.inquiryPage.page);
       setAuthState("signed-in");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "后台数据加载失败");
@@ -212,7 +215,7 @@ export default function AdminApp() {
     } finally {
       setLoading(false);
     }
-  }, [authState, days, search, status]);
+  }, [authState, days, page, search, status]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -233,7 +236,7 @@ export default function AdminApp() {
     setSnapshot(null);
   };
 
-  const submitSearch = (event: FormEvent) => { event.preventDefault(); void load({ search }); };
+  const submitSearch = (event: FormEvent) => { event.preventDefault(); setPage(1); void load({ search, page: 1 }); };
   const maxMetric = useMemo(() => snapshot ? Math.max(snapshot.metrics.pageViews, snapshot.metrics.visitors, 1) : 1, [snapshot]);
 
   if (authState === "loading") return <div className="admin-loading"><Brand compact/><span>正在进入运营后台…</span></div>;
@@ -247,7 +250,7 @@ export default function AdminApp() {
       <div className="admin-sidebar-foot"><span>当前管理员</span><strong>{username}</strong><button type="button" onClick={() => void logout()}><Icon name="logout"/>退出登录</button></div>
     </aside>
     <section className="admin-workspace">
-      <header className="admin-topbar"><div><span>OPERATIONS OVERVIEW</span><h1>运营数据概览</h1><p>查看访问表现、询价转化与客户跟进状态</p></div><div className="admin-top-actions"><label>统计周期<select value={days} onChange={(event) => { const value = Number(event.target.value); setDays(value); void load({ days: value }); }}><option value={7}>近 7 天</option><option value={30}>近 30 天</option><option value={90}>近 90 天</option></select></label><button type="button" onClick={() => void load()} disabled={loading}><Icon name="refresh"/>{loading ? "刷新中" : "刷新数据"}</button></div></header>
+      <header className="admin-topbar"><div><span>OPERATIONS OVERVIEW</span><h1>运营数据概览</h1><p>查看访问表现、询价转化与客户跟进状态</p></div><div className="admin-top-actions"><label>统计周期<select value={days} onChange={(event) => { const value = Number(event.target.value); setDays(value); setPage(1); void load({ days: value, page: 1 }); }}><option value={7}>近 7 天</option><option value={30}>近 30 天</option><option value={90}>近 90 天</option></select></label><button type="button" onClick={() => void load()} disabled={loading}><Icon name="refresh"/>{loading ? "刷新中" : "刷新数据"}</button></div></header>
       <div className="admin-content" id="overview">
         {error && <div className="admin-banner-error">{error}<button onClick={() => setError("")}>×</button></div>}
         <section className="admin-metrics">
@@ -259,8 +262,9 @@ export default function AdminApp() {
         <section className="admin-signal"><span>数据健康度</span><div><i style={{ width: `${Math.min(100, snapshot.metrics.visitors / maxMetric * 100)}%` }}/></div><p>转化率按“发起询价的独立访客 ÷ 独立访客”计算，避免重复浏览导致指标失真。</p></section>
         <TrendChart snapshot={snapshot}/>
         <section className="admin-rankings"><Ranking title="渠道贡献" subtitle="TRAFFIC SOURCE" rows={snapshot.sources} kind="source"/><Ranking title="高价值页面" subtitle="TOP LANDING PAGE" rows={snapshot.pages} kind="page"/></section>
-        <section className="admin-inquiry-toolbar"><div><span>询价工作台</span><h2>客户跟进列表</h2></div><form onSubmit={submitSearch}><label><Icon name="search"/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索电话、邮箱或城市"/></label><select value={status} onChange={(event) => { const value = event.target.value as InquiryStatus | "all"; setStatus(value); void load({ status: value }); }}><option value="all">全部状态</option>{inquiryStatuses.map((item) => <option key={item} value={item}>{inquiryStatusLabels[item]}</option>)}</select><button type="submit">搜索</button><a className="admin-export" href={`/api/admin/export?status=${status}`}>导出 CSV</a></form></section>
+        <section className="admin-inquiry-toolbar"><div><span>询价工作台</span><h2>客户跟进列表</h2></div><form onSubmit={submitSearch}><label><Icon name="search"/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索电话、邮箱或城市"/></label><select value={status} onChange={(event) => { const value = event.target.value as InquiryStatus | "all"; setStatus(value); setPage(1); void load({ status: value, page: 1 }); }}><option value="all">全部状态</option>{inquiryStatuses.map((item) => <option key={item} value={item}>{inquiryStatusLabels[item]}</option>)}</select><button type="submit">搜索</button><a className="admin-export" href={`/api/admin/export?status=${status}`}>导出 CSV</a></form></section>
         <InquiriesTable snapshot={snapshot} onOpen={setSelectedInquiry} onStatus={updateStatus}/>
+        {snapshot.inquiryPage.totalPages > 1 && <nav className="admin-pagination" aria-label="询价分页"><button type="button" disabled={loading || page <= 1} onClick={() => void load({ page: page - 1 })}>上一页</button><span>第 {page} / {snapshot.inquiryPage.totalPages} 页</span><button type="button" disabled={loading || page >= snapshot.inquiryPage.totalPages} onClick={() => void load({ page: page + 1 })}>下一页</button></nav>}
         <footer className="admin-footer"><span>中亚商机网 · 运营管理后台</span><small>访问统计不保存完整 IP 地址</small></footer>
       </div>
     </section>

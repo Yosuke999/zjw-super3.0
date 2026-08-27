@@ -72,4 +72,9 @@ export type AdminSnapshot = {
   pages: RankedMetric[];
   inquiries: InquiryRecord[];
   totalInquiries: number;
+  inquiryPage: {
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
 };

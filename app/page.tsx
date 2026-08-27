@@ -472,6 +472,7 @@ export default function Home() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const inquiryIdempotencyKey = useRef("");
   const [showBrand, setShowBrand] = useState(false);
   const [localeOpen, setLocaleOpen] = useState(false);
   const [logoVariant, setLogoVariant] = useState<LogoVariant>(1);
@@ -630,11 +631,12 @@ export default function Home() {
     setSubmitError("");
     try {
       const context = getClientContext();
+      inquiryIdempotencyKey.current ||= crypto.randomUUID();
       const phone = `${String(data.get("phoneCountryCode") ?? "")} ${String(data.get("phone") ?? "")}`.trim();
       const whatsapp = sameWhatsapp ? phone : `${String(data.get("whatsappCountryCode") ?? "")} ${String(data.get("whatsapp") ?? "")}`.trim();
       const response = await fetch("/api/inquiries", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "idempotency-key": inquiryIdempotencyKey.current },
         body: JSON.stringify({
           ...context,
           website: data.get("website"),
@@ -653,6 +655,7 @@ export default function Home() {
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Inquiry submission failed");
       setSubmitted(true);
+      inquiryIdempotencyKey.current = "";
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : "Inquiry submission failed");
     } finally {
