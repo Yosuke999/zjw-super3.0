@@ -44,9 +44,9 @@
 
 ## 上线前验收
 
-1. 在 Supabase SQL Editor 中依次执行 `migrations/0001_supabase.sql` 和 `migrations/0002_backend_hardening.sql`。
+1. 在 Supabase SQL Editor 中按编号依次执行 `migrations/` 中的全部 SQL 文件，当前必须执行至 `0003_admin_i18n_analytics.sql`。
 2. 在 Vercel 中配置上述生产环境变量后重新部署。
-3. 打开 `/api/health`，确认返回 `database: "supabase"`。
+3. 打开 `/api/health`，确认返回 `database: "supabase"`、`schema: "hardened-v3"` 和 `latestMigration: "0003_admin_i18n_analytics"`。如果 `0003` 未执行或只执行了一部分，健康检查会返回 503。
 4. 打开 `/admin`，使用生产管理员账号登录。
 5. 从公开网站提交一条测试询价，确认后台能看到商品、客户、来源和提交页面。
 6. 修改询价状态并导出 CSV。

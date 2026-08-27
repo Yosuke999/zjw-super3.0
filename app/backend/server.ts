@@ -53,6 +53,18 @@ type MemoryStore = {
 
 type SupabaseConfig = { url: string; serviceRoleKey: string };
 
+export const latestBackendMigration = "0003_admin_i18n_analytics" as const;
+
+export class BackendMigrationError extends Error {
+  readonly requiredMigration = latestBackendMigration;
+
+  constructor(cause: unknown) {
+    const details = cause instanceof Error ? cause.message : String(cause);
+    super(`Required database migration ${latestBackendMigration} is incomplete: ${details}`);
+    this.name = "BackendMigrationError";
+  }
+}
+
 declare global {
   var __centralAsiaBackendMemory: MemoryStore | undefined;
 }
@@ -546,7 +558,22 @@ export async function backendHealth() {
     supabaseRequest("inquiries?select=id,idempotency_key&limit=1", { method: "GET" }),
     supabaseRequest("notification_delivery_log?select=id&limit=1", { method: "GET" }),
   ]);
-  return { database: "supabase" as const, schema: "hardened-v2" as const };
+  const migrationProbe = JSON.stringify({ p_since: new Date().toISOString() });
+  try {
+    await Promise.all([
+      // 0003 adds these columns and RPCs. Probing both halves catches partial SQL runs too.
+      supabaseRequest("analytics_events?select=id,currency,market,properties&limit=1", { method: "GET" }),
+      supabaseRequest("rpc/admin_tracking_health", { method: "POST", body: migrationProbe }),
+      supabaseRequest("rpc/admin_event_funnel", { method: "POST", body: migrationProbe }),
+    ]);
+  } catch (error) {
+    throw new BackendMigrationError(error);
+  }
+  return {
+    database: "supabase" as const,
+    schema: "hardened-v3" as const,
+    latestMigration: latestBackendMigration,
+  };
 }
 
 export function getAdminCredentials() {

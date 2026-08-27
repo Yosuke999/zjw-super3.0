@@ -4,7 +4,7 @@ import { analyticsEventName, sanitizeAnalyticsProperties } from "../app/backend/
 import { analyticsIdentifier, fingerprint, HttpError, readJson, trackablePath } from "../app/backend/http.ts";
 import { idempotencyKey, normalizeInquiryItems, totalInquiryCny } from "../app/backend/inquiry-validation.ts";
 import { emptyBusinessDates, periodStart, shanghaiDate } from "../app/backend/metrics.ts";
-import { allowRequest, createInquiry, getAdminSnapshot, recordAnalytics, updateInquiryStatus } from "../app/backend/server.ts";
+import { allowRequest, backendHealth, createInquiry, getAdminSnapshot, recordAnalytics, updateInquiryStatus } from "../app/backend/server.ts";
 
 test("server rebuilds inquiry product names and prices from the catalog", () => {
   const items = normalizeInquiryItems([{ kind: "screen-protector", name: "tampered", quantity: 600, unitPriceCny: 0.01 }], "zh");
@@ -138,4 +138,48 @@ test("development rate limiter enforces its configured window", async () => {
   assert.equal(await allowRequest(key, 2, 60), true);
   assert.equal(await allowRequest(key, 2, 60), true);
   assert.equal(await allowRequest(key, 2, 60), false);
+});
+
+test("production health probe requires every 0003 column and RPC", async () => {
+  const originalUrl = process.env.SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const originalFetch = globalThis.fetch;
+  const requestedPaths: string[] = [];
+  process.env.SUPABASE_URL = "https://supabase.example";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+
+  try {
+    globalThis.fetch = async (input) => {
+      requestedPaths.push(new URL(String(input)).pathname + new URL(String(input)).search);
+      return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+    };
+    assert.deepEqual(await backendHealth(), {
+      database: "supabase",
+      schema: "hardened-v3",
+      latestMigration: "0003_admin_i18n_analytics",
+    });
+    assert.ok(requestedPaths.some((path) => path.includes("analytics_events?select=id,currency,market,properties")));
+    assert.ok(requestedPaths.some((path) => path.endsWith("/rpc/admin_tracking_health")));
+    assert.ok(requestedPaths.some((path) => path.endsWith("/rpc/admin_event_funnel")));
+
+    globalThis.fetch = async (input) => {
+      const path = new URL(String(input)).pathname;
+      return path.endsWith("/rpc/admin_event_funnel")
+        ? new Response("function is missing", { status: 404 })
+        : new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+    };
+    await assert.rejects(
+      backendHealth(),
+      (error) => error instanceof Error
+        && error.name === "BackendMigrationError"
+        && /0003_admin_i18n_analytics/.test(error.message)
+        && /Supabase 404: function is missing/.test(error.message),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = originalUrl;
+    if (originalKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+  }
 });
