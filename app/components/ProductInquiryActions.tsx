@@ -6,6 +6,7 @@ import { BASE_PATH } from "../base-path";
 import { buildPhoneHref, buildWhatsappHref, customerServiceCopy, type ContactMethod, type SiteLanguage } from "../customer-service";
 import { formatUnitCurrency, type Currency } from "../currency";
 import CustomerServiceDock from "./CustomerServiceDock";
+import { getClientContext } from "../lib/analytics-client";
 
 type Props = {
   lang: SiteLanguage;
@@ -25,28 +26,28 @@ const copy = {
     title: "Получить точную цену с доставкой", subtitle: "Товар уже добавлен. Укажите количество и контакты — менеджер подготовит расчёт.",
     quantity: "Количество", destination: "Город доставки", cities: ["Бишкек", "Ош", "Ташкент"], phoneLabel: "Контактный телефон",
     sameWhatsapp: "WhatsApp совпадает с телефоном", note: "Комментарий", notePlaceholder: "Модель, цвет, упаковка или срок",
-    submit: "Подготовить запрос", response: "Бесплатный расчёт · без обязательства заказывать", success: "Запрос подготовлен в текущей версии сайта.", close: "Закрыть",
+    submit: "Отправить запрос", response: "Бесплатный расчёт · без обязательства заказывать", success: "Запрос отправлен. Менеджер свяжется с вами.", close: "Закрыть",
   },
   ky: {
     add: "Сурамга кошуу", whatsapp: "WhatsApp аркылуу суроо", phone: "Менеджерге чалуу",
     title: "Жеткирүү менен так бааны алыңыз", subtitle: "Товар кошулду. Санын жана байланыш маалыматын көрсөтүңүз — менеджер эсеп даярдайт.",
     quantity: "Саны", destination: "Жеткирүү шаары", cities: ["Бишкек", "Ош", "Ташкент"], phoneLabel: "Байланыш телефону",
     sameWhatsapp: "WhatsApp телефону менен бирдей", note: "Кошумча маалымат", notePlaceholder: "Модель, түс, таңгак же мөөнөт",
-    submit: "Сурам даярдоо", response: "Акысыз эсеп · сатып алуу милдеттүү эмес", success: "Сурам сайттын учурдагы версиясында даярдалды.", close: "Жабуу",
+    submit: "Сурам жөнөтүү", response: "Акысыз эсеп · сатып алуу милдеттүү эмес", success: "Сурам жөнөтүлдү. Менеджер сиз менен байланышат.", close: "Жабуу",
   },
   uz: {
     add: "So‘rovga qo‘shish", whatsapp: "WhatsApp orqali so‘rash", phone: "Menejerga qo‘ng‘iroq",
     title: "Yetkazib berish bilan aniq narx", subtitle: "Mahsulot qo‘shildi. Miqdor va aloqani kiriting — menejer hisob tayyorlaydi.",
     quantity: "Miqdor", destination: "Yetkazish shahri", cities: ["Toshkent", "Bishkek", "Samarqand"], phoneLabel: "Aloqa telefoni",
     sameWhatsapp: "WhatsApp telefon bilan bir xil", note: "Izoh", notePlaceholder: "Model, rang, qadoq yoki muddat",
-    submit: "So‘rov tayyorlash", response: "Bepul hisob · buyurtma majburiy emas", success: "So‘rov saytning joriy versiyasida tayyorlandi.", close: "Yopish",
+    submit: "So‘rov yuborish", response: "Bepul hisob · buyurtma majburiy emas", success: "So‘rov yuborildi. Menejer siz bilan bog‘lanadi.", close: "Yopish",
   },
   zh: {
     add: "加入询价单", whatsapp: "WhatsApp 咨询", phone: "电话联系采购经理",
     title: "获取准确到货价", subtitle: "商品已加入询价，请确认数量并留下联系方式。",
     quantity: "采购数量", destination: "收货城市", cities: ["比什凯克", "奥什", "塔什干"], phoneLabel: "联系电话",
     sameWhatsapp: "WhatsApp 与联系电话相同", note: "备注", notePlaceholder: "需要的型号、颜色、包装或交期",
-    submit: "提交询价", response: "免费报价 · 不产生订购义务", success: "询价内容已在当前版本中准备完成。", close: "关闭",
+    submit: "提交询价", response: "免费报价 · 不产生订购义务", success: "询价已提交，采购经理将尽快与您联系。", close: "关闭",
   },
 } as const;
 
@@ -66,6 +67,8 @@ export default function ProductInquiryActions({ lang, product, currency }: Props
   const [sameWhatsapp, setSameWhatsapp] = useState(true);
   const [preferred, setPreferred] = useState<ContactMethod>("phone");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const message = `${service.manager}: ${product.name} × ${quantity}`;
   const whatsappHref = buildWhatsappHref(message);
   const phoneHref = buildPhoneHref();
@@ -76,9 +79,41 @@ export default function ProductInquiryActions({ lang, product, currency }: Props
     setOpen(true);
   };
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setSubmitting(true);
+    setSubmitted(false);
+    setSubmitError("");
+    try {
+      const context = getClientContext();
+      const phone = `${String(data.get("phoneCountryCode") ?? "")} ${String(data.get("phone") ?? "")}`.trim();
+      const response = await fetch("/api/inquiries", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...context,
+          website: data.get("website"),
+          destination: data.get("destination"),
+          phone,
+          whatsapp: sameWhatsapp ? phone : data.get("whatsapp"),
+          preferredContact: preferred,
+          note: data.get("note"),
+          language: lang,
+          currency,
+          market: lang === "uz" ? "uz" : "kg",
+          items: [{ kind: product.kind, name: product.name, quantity, unitPriceCny: product.costCny }],
+        }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Inquiry submission failed");
+      setSubmitted(true);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : "Inquiry submission failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return <>
@@ -112,6 +147,7 @@ export default function ProductInquiryActions({ lang, product, currency }: Props
         </article>
       </div>
       <form className="contact-form" onSubmit={submit}>
+        <label className="form-honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off"/></label>
         <label className="field full"><span>{text.destination}</span><select name="destination" defaultValue={text.cities[0]}>{text.cities.map((city) => <option key={city}>{city}</option>)}</select></label>
         <label className="field full"><span>{text.phoneLabel} *</span><div className="phone-field"><select name="phoneCountryCode" defaultValue={lang === "uz" ? "+998" : "+996"}><option>+996</option><option>+998</option><option>+7</option><option>+86</option></select><input name="phone" type="tel" inputMode="tel" autoComplete="tel" required placeholder="000 000 000"/></div></label>
         <label className="check-field full"><input type="checkbox" checked={sameWhatsapp} onChange={(event) => setSameWhatsapp(event.target.checked)}/><span>{text.sameWhatsapp}</span></label>
@@ -121,8 +157,9 @@ export default function ProductInquiryActions({ lang, product, currency }: Props
           <button type="button" className={preferred === "whatsapp" ? "active" : ""} onClick={() => setPreferred("whatsapp")}>{service.whatsapp}</button>
         </div></fieldset>
         <label className="field full"><span>{text.note}</span><textarea name="note" rows={3} placeholder={text.notePlaceholder}/></label>
-        <button className="submit-inquiry full" type="submit">{text.submit}</button>
+        <button className="submit-inquiry full" type="submit" disabled={submitting}>{submitting ? "…" : text.submit}</button>
         <p className="response-note full">{service.response}<span>{text.response}</span></p>
+        {submitError && <div className="inquiry-error full" role="alert">{submitError}</div>}
         {submitted && <div className="inquiry-success full" role="status">✓ {text.success}</div>}
       </form>
     </aside>

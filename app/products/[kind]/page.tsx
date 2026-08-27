@@ -24,7 +24,7 @@ const detailCopy = {
     retailPrice: "Розничная цена на рынке", kgMarket: "Кыргызстан", uzMarket: "Узбекистан", moq: "Минимальная партия", pieces: "шт.",
     inquiries: "Запросов на платформе", inquiriesUnit: "запросов", destination: "Направление доставки", cities: "Бишкек / Ташкент",
     transport: "Способ доставки", transportValue: "Преимущественно по железной дороге, по подтверждённой смете",
-    noticeTitle: "Пояснение к цене", notice: "Цены на странице — демонстрационные данные для первичного сравнения товаров. Характеристики, упаковка, наличие, сроки, доставка, налоги и итоговая цена подтверждаются ручным расчётом и официальным предложением.",
+    noticeTitle: "Пояснение к цене", notice: "Цены на странице являются ориентировочными и предназначены для первичного сравнения товаров. Характеристики, упаковка, наличие, сроки, доставка, налоги и итоговая цена подтверждаются ручным расчётом и официальным предложением.",
     cta: "Вернуться к списку и добавить в запрос →", assurances: [
       ["Подтверждение характеристик", "До заказа отдельно подтверждаем модель, цвет, материал, упаковку и количество."],
       ["Проверка поставщика", "До начала сотрудничества проверяем регистрационные данные, возможности поставки и образцы."],
@@ -38,7 +38,7 @@ const detailCopy = {
     retailPrice: "Жергиликтүү чекене баа", kgMarket: "Кыргызстан", uzMarket: "Өзбекстан", moq: "Эң аз буйрутма", pieces: "даана",
     inquiries: "Платформадагы сурамдар", inquiriesUnit: "сурам", destination: "Жеткирүү багыты", cities: "Бишкек / Ташкент",
     transport: "Жеткирүү жолу", transportValue: "Негизинен темир жол менен, тастыкталган эсеп боюнча",
-    noticeTitle: "Баага түшүндүрмө", notice: "Барактагы баалар товарларды алгачкы салыштыруу үчүн көрсөтүлгөн демонстрациялык маалымат. Мүнөздөмөлөр, таңгак, кампа, мөөнөт, жеткирүү, салыктар жана акыркы баа кол менен эсептелип, расмий сунушта ырасталат.",
+    noticeTitle: "Баага түшүндүрмө", notice: "Барактагы баалар товарларды алгачкы салыштыруу үчүн берилген болжолдуу маалымат. Мүнөздөмөлөр, таңгак, кампа, мөөнөт, жеткирүү, салыктар жана акыркы баа кол менен эсептелип, расмий сунушта ырасталат.",
     cta: "Тизмеге кайтып, сурамга кошуу →", assurances: [
       ["Мүнөздөмөлөрдү ырастоо", "Буйрутмага чейин модель, түс, материал, таңгак жана сан өзүнчө такталат."],
       ["Жеткирүүчүнү текшерүү", "Кызматташууга чейин каттоо маалыматтары, жеткирүү мүмкүнчүлүгү жана үлгүлөр текшерилет."],
@@ -52,7 +52,7 @@ const detailCopy = {
     retailPrice: "Mahalliy chakana narx", kgMarket: "Qirg‘iziston", uzMarket: "O‘zbekiston", moq: "Minimal buyurtma", pieces: "dona",
     inquiries: "Platformadagi so‘rovlar", inquiriesUnit: "so‘rov", destination: "Yetkazish yo‘nalishi", cities: "Bishkek / Toshkent",
     transport: "Yetkazish usuli", transportValue: "Asosan temir yo‘l orqali, tasdiqlangan hisob bo‘yicha",
-    noticeTitle: "Narx izohi", notice: "Sahifadagi narxlar mahsulotlarni dastlabki taqqoslash uchun ko‘rsatilgan namoyish ma’lumotlaridir. Xususiyatlar, qadoq, mavjudlik, muddat, yetkazish, soliqlar va yakuniy narx qo‘lda hisoblanib, rasmiy taklifda tasdiqlanadi.",
+    noticeTitle: "Narx izohi", notice: "Sahifadagi narxlar mahsulotlarni dastlabki taqqoslash uchun berilgan taxminiy ma’lumotlardir. Xususiyatlar, qadoq, mavjudlik, muddat, yetkazish, soliqlar va yakuniy narx qo‘lda hisoblanib, rasmiy taklifda tasdiqlanadi.",
     cta: "Ro‘yxatga qaytib, so‘rovga qo‘shish →", assurances: [
       ["Xususiyatlarni tasdiqlash", "Buyurtmadan oldin model, rang, material, qadoq va miqdor alohida tasdiqlanadi."],
       ["Yetkazib beruvchini tekshirish", "Hamkorlikdan oldin ro‘yxat ma’lumotlari, yetkazish imkoniyati va namunalar tekshiriladi."],
@@ -66,7 +66,7 @@ const detailCopy = {
     retailPrice: "当地零售参考", kgMarket: "吉尔吉斯斯坦", uzMarket: "乌兹别克斯坦", moq: "最低起订量", pieces: "件",
     inquiries: "平台询价记录", inquiriesUnit: "次", destination: "运输目的地", cities: "比什凯克 / 塔什干",
     transport: "运输方式", transportValue: "铁路为主，按确认报价执行",
-    noticeTitle: "报价说明", notice: "页面价格为本地演示数据，用于初步选品比较。实际规格、包装、库存、交期、物流、税费及最终到货价，以人工核价和正式报价单为准。",
+    noticeTitle: "报价说明", notice: "页面价格为选品参考价，用于初步比较。实际规格、包装、库存、交期、物流、税费及最终到货价，以人工核价和正式报价单为准。",
     cta: "返回列表并加入询价单 →", assurances: [
       ["规格确认", "下单前逐项确认型号、颜色、材质、包装和数量。"],
       ["供应商核验", "正式合作前核验营业资质、供货能力与样品记录。"],

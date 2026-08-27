@@ -9,6 +9,7 @@ import { buildProductHref, currencyOptions, formatCurrency, formatExchangeRate, 
 import { kyrgyzProductNames } from "./product-localization";
 import CustomerServiceDock from "./components/CustomerServiceDock";
 import { customerServiceCopy, type ContactMethod } from "./customer-service";
+import { getClientContext } from "./lib/analytics-client";
 
 type Lang = "ru" | "ky" | "uz" | "zh";
 type CategoryId = "home" | "fashion" | "tools" | "digital" | "auto" | "beauty";
@@ -139,7 +140,7 @@ const inquiryCopy = {
     preferred: "Предпочтительный способ связи", phoneFirst: "Телефон", whatsappFirst: "WhatsApp", emailFirst: "Почта", note: "Комментарий",
     notePlaceholder: "Нужные модели, цвета, сроки или другие пожелания", submit: "Отправить запрос и ждать звонка",
     response: "В рабочее время свяжемся с вами в течение 30 минут.", free: "Бесплатный расчёт · без обязательства заказывать",
-    success: "Запрос подготовлен. Мы свяжемся с вами по телефону.", close: "Закрыть", exchange: "Ориентировочный курс",
+    success: "Запрос отправлен. Мы свяжемся с вами по телефону.", close: "Закрыть", exchange: "Ориентировочный курс",
     subtotal: "Стоимость товаров", rate: "Курс пересчёта", excluded: "Не включено в сумму",
     excludedDetail: "Доставка, налоги и сервисный сбор будут указаны после ручного расчёта.",
   },
@@ -151,7 +152,7 @@ const inquiryCopy = {
     preferred: "Байланыштын ыңгайлуу жолу", phoneFirst: "Телефон", whatsappFirst: "WhatsApp", emailFirst: "Электрондук дарек", note: "Кошумча маалымат",
     notePlaceholder: "Модель, түс, мөөнөт же башка каалоолор", submit: "Сурам жөнөтүп, чалууну күтүү",
     response: "Иш убактысында 30 мүнөттүн ичинде байланышабыз.", free: "Акысыз эсеп · сатып алуу милдеттүү эмес",
-    success: "Сурам даяр. Биз сизге телефон аркылуу байланышабыз.", close: "Жабуу", exchange: "Болжолдуу курс",
+    success: "Сурам жөнөтүлдү. Биз сизге телефон аркылуу байланышабыз.", close: "Жабуу", exchange: "Болжолдуу курс",
     subtotal: "Товардын суммасы", rate: "Эсептөө курсу", excluded: "Суммага кирген жок",
     excludedDetail: "Жеткирүү, салыктар жана тейлөө акысы кол менен эсептелгенден кийин көрсөтүлөт.",
   },
@@ -163,7 +164,7 @@ const inquiryCopy = {
     preferred: "Afzal aloqa usuli", phoneFirst: "Telefon", whatsappFirst: "WhatsApp", emailFirst: "E-pochta", note: "Izoh",
     notePlaceholder: "Model, rang, muddat yoki boshqa istaklar", submit: "So‘rov yuborish va qo‘ng‘iroqni kutish",
     response: "Ish vaqtida 30 daqiqa ichida bog‘lanamiz.", free: "Bepul hisob-kitob · buyurtma majburiy emas",
-    success: "So‘rov tayyor. Siz bilan telefon orqali bog‘lanamiz.", close: "Yopish", exchange: "Taxminiy kurs",
+    success: "So‘rov yuborildi. Siz bilan telefon orqali bog‘lanamiz.", close: "Yopish", exchange: "Taxminiy kurs",
     subtotal: "Mahsulotlar summasi", rate: "Hisoblash kursi", excluded: "Summaga kiritilmagan",
     excludedDetail: "Yetkazish, soliqlar va xizmat haqi qo‘lda hisoblangandan keyin ko‘rsatiladi.",
   },
@@ -175,7 +176,7 @@ const inquiryCopy = {
     preferred: "优先联系方式", phoneFirst: "电话优先", whatsappFirst: "WhatsApp", emailFirst: "邮箱", note: "备注",
     notePlaceholder: "需要的型号、颜色、交期或其他要求", submit: "提交询价，等待电话联系",
     response: "工作时间内，我们将在 30 分钟内与您联系。", free: "免费报价 · 不产生订购义务",
-    success: "询价信息已准备，我们会优先通过电话与您联系。", close: "关闭", exchange: "参考汇率换算",
+    success: "询价已提交，我们会优先通过电话与您联系。", close: "关闭", exchange: "参考汇率换算",
     subtotal: "商品小计", rate: "参考汇率", excluded: "暂未计入",
     excludedDetail: "物流、税费及服务费将在人工核价后单独列明。",
   },
@@ -678,6 +679,8 @@ export default function Home() {
   const [sameWhatsapp, setSameWhatsapp] = useState(true);
   const [preferredContact, setPreferredContact] = useState<"phone" | "whatsapp" | "email">("phone");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [showBrand, setShowBrand] = useState(false);
   const [localeOpen, setLocaleOpen] = useState(false);
   const [logoVariant, setLogoVariant] = useState<LogoVariant>(1);
@@ -827,9 +830,43 @@ export default function Home() {
     setSubmitted(false);
   };
 
-  const submitInquiry = (event: FormEvent<HTMLFormElement>) => {
+  const submitInquiry = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setSubmitting(true);
+    setSubmitted(false);
+    setSubmitError("");
+    try {
+      const context = getClientContext();
+      const phone = `${String(data.get("phoneCountryCode") ?? "")} ${String(data.get("phone") ?? "")}`.trim();
+      const whatsapp = sameWhatsapp ? phone : `${String(data.get("whatsappCountryCode") ?? "")} ${String(data.get("whatsapp") ?? "")}`.trim();
+      const response = await fetch("/api/inquiries", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...context,
+          website: data.get("website"),
+          destination: data.get("destination"),
+          phone,
+          whatsapp,
+          email: data.get("email"),
+          preferredContact: data.get("preferredContact"),
+          note: data.get("note"),
+          language: lang,
+          currency,
+          market,
+          items: selectedProducts.map((product) => ({ kind: product.kind, name: productLabel(product), quantity: quoteItems[product.kind], unitPriceCny: priceNumber(product.cost) })),
+        }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Inquiry submission failed");
+      setSubmitted(true);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : "Inquiry submission failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const openCustomerService = (method: ContactMethod) => {
@@ -996,7 +1033,7 @@ export default function Home() {
             <div className="product-meta"><span>{t.moq} {product.moq} {t.pieces}</span><span>{product.orders} {t.orders}</span></div>
             <div className="product-footer">
               <span><i/>{t.rail} → {market === "kg" ? s.kgCity : s.uzCity}</span>
-              <div><Link href={productHref(product.kind)}>{detailLabel} <b aria-hidden="true">→</b></Link><button className={isAdded ? "added" : ""} onClick={(event) => addToQuote(product, event.currentTarget.closest(".product-card"))} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button></div>
+              <div><Link href={productHref(product.kind)}>{detailLabel} <b aria-hidden="true">→</b></Link><button className={isAdded ? "added" : ""} onClick={(event) => addToQuote(product, event.currentTarget.closest<HTMLElement>(".product-card"))} aria-pressed={isAdded}>{isAdded ? <><b>✓</b>{iq.added}</> : iq.add}</button></div>
             </div>
           </div>
         </article>;
@@ -1090,6 +1127,7 @@ export default function Home() {
         </div>}
 
       <form className="contact-form" onSubmit={submitInquiry}>
+          <label className="form-honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off"/></label>
           <label className="field full"><span>{iq.destination}</span><select name="destination" defaultValue={destinationOptions[0]}>{destinationOptions.map((city) => <option key={city}>{city}</option>)}</select></label>
           <label className="field full"><span>{iq.phone} *</span><div className="phone-field"><select name="phoneCountryCode" key={market} defaultValue={market === "kg" ? "+996" : "+998"}><option>+996</option><option>+998</option><option>+7</option><option>+86</option></select><input name="phone" type="tel" inputMode="tel" autoComplete="tel" required placeholder="000 000 000"/></div></label>
           <label className="check-field full"><input type="checkbox" checked={sameWhatsapp} onChange={(event) => setSameWhatsapp(event.target.checked)}/><span>{iq.sameWhatsapp}</span></label>
@@ -1099,8 +1137,9 @@ export default function Home() {
             {(["phone", "whatsapp", "email"] as const).map((method) => <button type="button" key={method} className={preferredContact === method ? "active" : ""} onClick={() => setPreferredContact(method)}>{method === "phone" ? iq.phoneFirst : method === "whatsapp" ? iq.whatsappFirst : iq.emailFirst}</button>)}
           </div><input type="hidden" name="preferredContact" value={preferredContact}/></fieldset>
           <label className="field full"><span>{iq.note}</span><textarea name="note" rows={3} placeholder={iq.notePlaceholder}/></label>
-          <button className="submit-inquiry full" type="submit">{iq.submit}<Icon name="arrow"/></button>
+          <button className="submit-inquiry full" type="submit" disabled={submitting}>{submitting ? "…" : iq.submit}<Icon name="arrow"/></button>
           <p className="response-note full">{iq.response}<span>{iq.free}</span></p>
+          {submitError && <div className="inquiry-error full" role="alert">{submitError}</div>}
           {submitted && <div className="inquiry-success full" role="status">✓ {iq.success}</div>}
       </form>
     </aside>
