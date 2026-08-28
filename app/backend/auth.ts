@@ -3,6 +3,7 @@ import type { AdminRole, AdminSession } from "./contracts.ts";
 import { adminRoleAllows } from "./contracts.ts";
 import {
   adminAuthClient,
+  adminAuditContext,
   createAdminSession,
   getAdminProfile,
   isProductionIdentityConfigured,
@@ -142,19 +143,19 @@ export async function beginAdminLogin(identifier: string, password: string, cont
   const client = adminAuthClient();
   const authenticated = await client.auth.signInWithPassword({ email, password });
   if (authenticated.error || !authenticated.data.user || !authenticated.data.session) {
-    await recordAdminAuditSafe({ actorEmail: email, action: "admin.login.password", outcome: "failure", context });
+    await recordAdminAuditSafe({ actorEmail: email, action: "admin.login.failure", outcome: "failure", metadata: { stage: "password" }, context });
     return { ok: false as const, configurationError: false as const };
   }
   const profile = await getAdminProfile(authenticated.data.user.id);
   if (!profile || !profile.active) {
     await client.auth.admin.signOut(authenticated.data.session.access_token, "global").catch(() => undefined);
-    await recordAdminAuditSafe({ actorEmail: email, action: "admin.login.password", outcome: "denied", metadata: { reason: profile ? "inactive" : "profile_missing" }, context });
+    await recordAdminAuditSafe({ actorEmail: email, action: "admin.login.failure", outcome: "denied", metadata: { stage: "authorization", reason: profile ? "inactive" : "profile_missing" }, context });
     return { ok: false as const, configurationError: false as const };
   }
 
   if (!profile.mfa_required) {
     const created = await createAdminSession(profile, context);
-    await recordAdminAuditSafe({ actor: created.session, action: "admin.login.complete", metadata: { mfa: false }, context });
+    await recordAdminAuditSafe({ actor: created.session, action: "admin.login.success", targetType: "admin_session", targetId: created.session.sessionId, metadata: { mfa: false }, context });
     return { ok: true as const, next: "complete" as const, value: created.token, maxAge: created.maxAge, session: created.session };
   }
 
@@ -184,19 +185,25 @@ export async function beginAdminLogin(identifier: string, password: string, cont
 export async function completeAdminMfa(code: string, context: AuditContext = {}) {
   const value = (await cookies()).get(adminPendingMfaCookieName())?.value ?? "";
   const pending = await openPendingMfa(value);
-  if (!pending || !/^\d{6}$/.test(code)) return { ok: false as const };
+  if (!pending || !/^\d{6}$/.test(code)) {
+    await recordAdminAuditSafe({ action: "admin.login.failure", outcome: "failure", metadata: { stage: "mfa", reason: "invalid_or_expired_pending_login" }, context });
+    return { ok: false as const };
+  }
   const client = adminAuthClient();
   const restored = await client.auth.setSession({ access_token: pending.accessToken, refresh_token: pending.refreshToken });
-  if (restored.error) return { ok: false as const };
+  if (restored.error) {
+    await recordAdminAuditSafe({ action: "admin.login.failure", outcome: "failure", metadata: { stage: "mfa", reason: "session_restore_failed" }, context });
+    return { ok: false as const };
+  }
   const verified = await client.auth.mfa.challengeAndVerify({ factorId: pending.factorId, code });
   if (verified.error) {
-    await recordAdminAuditSafe({ actorEmail: restored.data.user?.email ?? "", action: "admin.login.mfa", outcome: "failure", context });
+    await recordAdminAuditSafe({ actorEmail: restored.data.user?.email ?? "", action: "admin.login.failure", outcome: "failure", metadata: { stage: "mfa", reason: "invalid_code" }, context });
     return { ok: false as const };
   }
   const profile = await getAdminProfile(pending.userId);
   if (!profile || !profile.active) return { ok: false as const };
   const created = await createAdminSession(profile, context);
-  await recordAdminAuditSafe({ actor: created.session, action: "admin.login.complete", metadata: { mfa: true }, context });
+  await recordAdminAuditSafe({ actor: created.session, action: "admin.login.success", targetType: "admin_session", targetId: created.session.sessionId, metadata: { mfa: true }, context });
   return { ok: true as const, value: created.token, maxAge: created.maxAge, session: created.session };
 }
 
@@ -205,6 +212,15 @@ export async function readSession() {
   if (!value) return null;
   if (!isProductionIdentityConfigured()) return await readLocalSession(value);
   return await resolveAdminSession(value);
+}
+
+export async function beginAdminMutation(request: Request, requestId: string, action: string) {
+  const auditContext = await adminAuditContext(request, requestId);
+  if (!isSameOrigin(request)) {
+    await recordAdminAuditSafe({ action, outcome: "denied", metadata: { reason: "untrusted_origin" }, context: auditContext });
+    return { ok: false as const, status: 403, error: "请求来源不受信任", auditContext, session: null };
+  }
+  return { ok: true as const, auditContext, session: await readSession() };
 }
 
 export async function revokeCurrentSession(reason = "logout") {

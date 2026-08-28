@@ -53,7 +53,7 @@ type MemoryStore = {
 
 type SupabaseConfig = { url: string; serviceRoleKey: string };
 
-export const latestBackendMigration = "0004_admin_identity" as const;
+export const latestBackendMigration = "0004_admin_identity_audit" as const;
 
 export class BackendMigrationError extends Error {
   readonly requiredMigration = latestBackendMigration;
@@ -567,7 +567,8 @@ export async function backendHealth() {
       supabaseRequest("rpc/admin_event_funnel", { method: "POST", body: migrationProbe }),
       supabaseRequest("admin_profiles?select=id,email,role,active,mfa_required,session_version&limit=1", { method: "GET" }),
       supabaseRequest("admin_sessions?select=id,token_hash,revoked_at,expires_at&limit=1", { method: "GET" }),
-      supabaseRequest("admin_audit_logs?select=id,action,outcome,created_at&limit=1", { method: "GET" }),
+      supabaseRequest("admin_audit_logs?select=id,actor_id,action,outcome,request_id,ip_hash,created_at&limit=1", { method: "GET" }),
+      supabaseRequest("rpc/admin_audit_health", { method: "POST", body: "{}" }),
       supabaseRequest("rpc/admin_resolve_session", { method: "POST", body: JSON.stringify({ p_token_hash: "health-probe-not-a-session" }) }),
     ]);
   } catch (error) {
@@ -575,7 +576,7 @@ export async function backendHealth() {
   }
   return {
     database: "supabase" as const,
-    schema: "identity-v4" as const,
+    schema: "identity-audit-v4" as const,
     latestMigration: latestBackendMigration,
   };
 }

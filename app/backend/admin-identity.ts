@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   adminRoles,
   type AdminAuditEvent,
+  type AdminAuditPage,
   type AdminRole,
   type AdminSession,
   type AdminUserSummary,
@@ -24,6 +25,32 @@ type AdminProfileRow = {
 };
 
 type AuditContext = { requestId?: string; ipHash?: string };
+
+export const adminAuditActions = [
+  "admin.login.success",
+  "admin.login.failure",
+  "admin.logout",
+  "admin.session.revoke",
+  "admin.inquiry.status_change",
+  "admin.inquiry.csv_export",
+  "admin.user.create",
+  "admin.user.activate",
+  "admin.user.deactivate",
+  "admin.user.role_change",
+  "admin.user.update",
+  "admin.mfa.reset",
+  "admin.password.change",
+  "admin.login.mfa_required",
+  "admin.identity.view",
+  "admin.dashboard.view",
+  // Keep pre-closure event names filterable after this migration is deployed.
+  "admin.login.password",
+  "admin.login.complete",
+  "admin.login.mfa",
+  "admin.session.revoke_all",
+  "admin.inquiry.status",
+  "admin.inquiry.export",
+] as const;
 
 export async function adminAuditContext(request: Request, requestId: string): Promise<AuditContext> {
   return { requestId, ipHash: await fingerprint(clientIp(request), "admin-audit") };
@@ -101,7 +128,8 @@ export async function createAdminSession(profile: AdminProfileRow, context: Audi
     expires_at: expiresAt.toISOString(),
   }).select("id").single();
   if (error) throw error;
-  await client.from("admin_profiles").update({ last_login_at: new Date().toISOString() }).eq("id", profile.id);
+  const profileUpdate = await client.from("admin_profiles").update({ last_login_at: new Date().toISOString() }).eq("id", profile.id);
+  if (profileUpdate.error) throw profileUpdate.error;
   return {
     token,
     session: {
@@ -150,6 +178,16 @@ function safeMetadata(value: Record<string, unknown> | undefined) {
   return output;
 }
 
+function auditEventFromRow(row: Record<string, unknown>): AdminAuditEvent {
+  return {
+    id: String(row.id), actorId: String(row.actor_id ?? ""), actorEmail: String(row.actor_email ?? ""),
+    action: String(row.action), targetType: String(row.target_type ?? ""), targetId: String(row.target_id ?? ""),
+    outcome: row.outcome as AdminAuditEvent["outcome"], requestId: String(row.request_id ?? ""),
+    ipFingerprint: String(row.ip_hash ?? ""), metadata: safeMetadata(row.metadata as Record<string, unknown>),
+    createdAt: String(row.created_at),
+  };
+}
+
 export async function recordAdminAudit(input: {
   actor?: Pick<AdminSession, "userId" | "email"> | null;
   actorEmail?: string;
@@ -191,7 +229,7 @@ export async function listAdminIdentity() {
   const client = adminAuthClient();
   const [profiles, audit] = await Promise.all([
     client.from("admin_profiles").select("*").order("created_at", { ascending: true }),
-    client.from("admin_audit_logs").select("id,actor_email,action,target_type,target_id,outcome,request_id,metadata,created_at").order("created_at", { ascending: false }).limit(100),
+    client.from("admin_audit_logs").select("id,actor_id,actor_email,action,target_type,target_id,outcome,request_id,ip_hash,metadata,created_at").order("created_at", { ascending: false }).limit(20),
   ]);
   if (profiles.error) throw profiles.error;
   if (audit.error) throw audit.error;
@@ -202,12 +240,50 @@ export async function listAdminIdentity() {
   }));
   return {
     users: profileRows.map((profile, index) => profileFromRow(profile, factorStates[index])),
-    audit: (audit.data ?? []).map((row) => ({
-      id: String(row.id), actorEmail: String(row.actor_email), action: String(row.action),
-      targetType: String(row.target_type), targetId: String(row.target_id),
-      outcome: row.outcome as AdminAuditEvent["outcome"], requestId: String(row.request_id),
-      metadata: safeMetadata(row.metadata as Record<string, unknown>), createdAt: String(row.created_at),
-    })),
+    audit: (audit.data ?? []).map((row) => auditEventFromRow(row)),
+  };
+}
+
+function auditDate(value: string | undefined, endOfDay = false) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "";
+  const timestamp = Date.parse(`${value}T00:00:00.000+08:00`);
+  if (!Number.isFinite(timestamp)) return "";
+  return new Date(timestamp + (endOfDay ? 86_400_000 : 0)).toISOString();
+}
+
+export async function listAdminAudit(input: {
+  actorId?: string; action?: string; from?: string; to?: string; page?: number; pageSize?: number;
+}): Promise<AdminAuditPage> {
+  const requestedPageSize = Number(input.pageSize ?? 50);
+  const requestedPage = Number(input.page ?? 1);
+  const pageSize = Number.isFinite(requestedPageSize) ? Math.max(10, Math.min(100, Math.floor(requestedPageSize))) : 50;
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  if (!isProductionIdentityConfigured()) {
+    return { events: [], administrators: [], actions: [...adminAuditActions], page, pageSize, total: 0, totalPages: 1 };
+  }
+  const client = adminAuthClient();
+  const profiles = await client.from("admin_profiles").select("id,email,display_name").order("email", { ascending: true });
+  if (profiles.error) throw profiles.error;
+  let query = client.from("admin_audit_logs")
+    .select("id,actor_id,actor_email,action,target_type,target_id,outcome,request_id,ip_hash,metadata,created_at", { count: "exact" });
+  if (input.actorId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.actorId)) {
+    const profile = (profiles.data ?? []).find((row) => String(row.id) === input.actorId);
+    const email = String(profile?.email ?? "").replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+    query = email ? query.or(`actor_id.eq.${input.actorId},actor_email.eq."${email}"`) : query.eq("actor_id", input.actorId);
+  }
+  if (input.action && adminAuditActions.includes(input.action as typeof adminAuditActions[number])) query = query.eq("action", input.action);
+  const from = auditDate(input.from);
+  const to = auditDate(input.to, true);
+  if (from) query = query.gte("created_at", from);
+  if (to) query = query.lt("created_at", to);
+  const start = (page - 1) * pageSize;
+  const logs = await query.order("created_at", { ascending: false }).range(start, start + pageSize - 1);
+  if (logs.error) throw logs.error;
+  const total = logs.count ?? 0;
+  return {
+    events: (logs.data ?? []).map((row) => auditEventFromRow(row)),
+    administrators: (profiles.data ?? []).map((row) => ({ id: String(row.id), email: String(row.email), displayName: String(row.display_name ?? "") })),
+    actions: [...adminAuditActions], page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)),
   };
 }
 
@@ -260,13 +336,26 @@ export async function updateAdminUser(userId: string, patch: {
   const { data, error } = await client.from("admin_profiles").update(changes).eq("id", userId).select("*").single();
   if (error) throw error;
   if (securityChanged) {
-    await client.from("admin_sessions").update({ revoked_at: new Date().toISOString(), revoked_reason: patch.password !== undefined ? "password_reset" : "authorization_changed" }).eq("user_id", userId).is("revoked_at", null);
+    const revoked = await client.from("admin_sessions").update({ revoked_at: new Date().toISOString(), revoked_reason: patch.password !== undefined ? "password_reset" : "authorization_changed" }).eq("user_id", userId).is("revoked_at", null);
+    if (revoked.error) throw revoked.error;
   }
   if (patch.password !== undefined) {
     const passwordUpdate = await client.auth.admin.updateUserById(userId, { password: patch.password });
     if (passwordUpdate.error) throw passwordUpdate.error;
   }
-  await recordAdminAuditSafe({ actor, action: "admin.user.update", targetType: "admin_user", targetId: userId, metadata: { authorizationChanged, passwordReset: patch.password !== undefined }, context });
+  if (patch.role !== undefined && patch.role !== before.role) {
+    await recordAdminAuditSafe({ actor, action: "admin.user.role_change", targetType: "admin_user", targetId: userId, metadata: { fromRole: before.role, toRole: patch.role }, context });
+  }
+  if (patch.active !== undefined && patch.active !== before.active) {
+    await recordAdminAuditSafe({ actor, action: patch.active ? "admin.user.activate" : "admin.user.deactivate", targetType: "admin_user", targetId: userId, metadata: { active: patch.active }, context });
+  }
+  if (securityChanged) {
+    await recordAdminAuditSafe({ actor, action: "admin.session.revoke", targetType: "admin_user", targetId: userId, metadata: { reason: patch.password !== undefined ? "password_reset" : "authorization_changed" }, context });
+  }
+  if ((patch.displayName !== undefined && patch.displayName.trim() !== before.display_name)
+    || patch.mfaRequired !== undefined || patch.password !== undefined) {
+    await recordAdminAuditSafe({ actor, action: "admin.user.update", targetType: "admin_user", targetId: userId, metadata: { authorizationChanged, passwordReset: patch.password !== undefined }, context });
+  }
   return profileFromRow(data as AdminProfileRow);
 }
 
@@ -277,8 +366,9 @@ export async function revokeAllAdminSessions(userId: string, actor: AdminSession
   const now = new Date().toISOString();
   const { error } = await client.from("admin_sessions").update({ revoked_at: now, revoked_reason: "owner_revoked" }).eq("user_id", userId).is("revoked_at", null);
   if (error) throw error;
-  await client.from("admin_profiles").update({ session_version: profile.session_version + 1 }).eq("id", userId);
-  await recordAdminAuditSafe({ actor, action: "admin.session.revoke_all", targetType: "admin_user", targetId: userId, context });
+  const version = await client.from("admin_profiles").update({ session_version: profile.session_version + 1 }).eq("id", userId);
+  if (version.error) throw version.error;
+  await recordAdminAuditSafe({ actor, action: "admin.session.revoke", targetType: "admin_user", targetId: userId, metadata: { reason: "owner_revoked" }, context });
   return true;
 }
 
@@ -292,8 +382,10 @@ export async function resetAdminMfa(userId: string, actor: AdminSession, context
     const deleted = await client.auth.admin.mfa.deleteFactor({ userId, id: factor.id });
     if (deleted.error) throw deleted.error;
   }
-  await client.from("admin_sessions").update({ revoked_at: new Date().toISOString(), revoked_reason: "mfa_reset" }).eq("user_id", userId).is("revoked_at", null);
-  await client.from("admin_profiles").update({ mfa_required: true, session_version: profile.session_version + 1 }).eq("id", userId);
+  const revoked = await client.from("admin_sessions").update({ revoked_at: new Date().toISOString(), revoked_reason: "mfa_reset" }).eq("user_id", userId).is("revoked_at", null);
+  if (revoked.error) throw revoked.error;
+  const version = await client.from("admin_profiles").update({ mfa_required: true, session_version: profile.session_version + 1 }).eq("id", userId);
+  if (version.error) throw version.error;
   await recordAdminAuditSafe({ actor, action: "admin.mfa.reset", targetType: "admin_user", targetId: userId, context });
   return true;
 }
@@ -312,8 +404,10 @@ export async function changeOwnAdminPassword(session: AdminSession, currentPassw
   if (updated.error) throw updated.error;
   const profile = await getAdminProfile(session.userId);
   if (!profile) return false;
-  await client.from("admin_sessions").update({ revoked_at: new Date().toISOString(), revoked_reason: "password_changed" }).eq("user_id", session.userId).is("revoked_at", null);
-  await client.from("admin_profiles").update({ session_version: profile.session_version + 1 }).eq("id", session.userId);
+  const revoked = await client.from("admin_sessions").update({ revoked_at: new Date().toISOString(), revoked_reason: "password_changed" }).eq("user_id", session.userId).is("revoked_at", null);
+  if (revoked.error) throw revoked.error;
+  const version = await client.from("admin_profiles").update({ session_version: profile.session_version + 1 }).eq("id", session.userId);
+  if (version.error) throw version.error;
   await recordAdminAuditSafe({ actor: session, action: "admin.password.change", targetType: "admin_user", targetId: session.userId, context });
   return true;
 }
