@@ -21,7 +21,7 @@ const actionLabels: Record<string, string> = {
   "admin.password.change": "修改管理员密码",
   "admin.identity.view": "查看身份或审计数据",
   "admin.dashboard.view": "查看运营后台",
-  "admin.login.password": "登录密码验证（历史）",
+  "admin.login.password": "登录密码验证（历史）", // NOSONAR: audit event identifier, not a credential.
   "admin.login.complete": "登录成功（历史）",
   "admin.login.mfa": "MFA 验证（历史）",
   "admin.session.revoke_all": "撤销全部会话（历史）",

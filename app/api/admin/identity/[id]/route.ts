@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { isSameOrigin, readSession, requireAdminRole } from "../../../../backend/auth";
-import { adminAuditContext, recordAdminAuditSafe, resetAdminMfa, revokeAllAdminSessions, updateAdminUser } from "../../../../backend/admin-identity";
+import { beginAdminMutation, requireAdminRole } from "../../../../backend/auth";
+import { recordAdminAuditSafe, resetAdminMfa, revokeAllAdminSessions, updateAdminUser } from "../../../../backend/admin-identity";
 import { adminRoles, type AdminRole } from "../../../../backend/contracts";
 import { logError, publicError, readJson, text } from "../../../../backend/http";
 
@@ -8,16 +8,12 @@ export const dynamic = "force-dynamic";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const requestId = crypto.randomUUID();
-  const auditContext = await adminAuditContext(request, requestId);
-  let session = null as Awaited<ReturnType<typeof readSession>>;
+  const mutation = await beginAdminMutation(request, requestId, "admin.user.update");
+  if (!mutation.ok) return NextResponse.json({ error: mutation.error }, { status: mutation.status });
+  const { auditContext, session } = mutation;
   let userId = "";
   let auditAction = "admin.user.update";
   try {
-    if (!isSameOrigin(request)) {
-      await recordAdminAuditSafe({ action: auditAction, outcome: "denied", metadata: { reason: "untrusted_origin" }, context: auditContext });
-      return NextResponse.json({ error: "请求来源不受信任" }, { status: 403 });
-    }
-    session = await readSession();
     if (!session) return NextResponse.json({ error: "请先登录" }, { status: 401 });
     if (!requireAdminRole(session, "owner")) {
       await recordAdminAuditSafe({ actor: session, action: auditAction, outcome: "denied", metadata: { reason: "insufficient_role" }, context: auditContext });

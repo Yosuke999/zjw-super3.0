@@ -3,6 +3,7 @@ import type { AdminRole, AdminSession } from "./contracts.ts";
 import { adminRoleAllows } from "./contracts.ts";
 import {
   adminAuthClient,
+  adminAuditContext,
   createAdminSession,
   getAdminProfile,
   isProductionIdentityConfigured,
@@ -211,6 +212,15 @@ export async function readSession() {
   if (!value) return null;
   if (!isProductionIdentityConfigured()) return await readLocalSession(value);
   return await resolveAdminSession(value);
+}
+
+export async function beginAdminMutation(request: Request, requestId: string, action: string) {
+  const auditContext = await adminAuditContext(request, requestId);
+  if (!isSameOrigin(request)) {
+    await recordAdminAuditSafe({ action, outcome: "denied", metadata: { reason: "untrusted_origin" }, context: auditContext });
+    return { ok: false as const, status: 403, error: "请求来源不受信任", auditContext, session: null };
+  }
+  return { ok: true as const, auditContext, session: await readSession() };
 }
 
 export async function revokeCurrentSession(reason = "logout") {

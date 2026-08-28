@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSameOrigin, readSession, requireAdminRole } from "../../../backend/auth";
+import { beginAdminMutation, readSession, requireAdminRole } from "../../../backend/auth";
 import {
   adminAuditContext,
   createAdminUser,
@@ -33,14 +33,10 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
-  const auditContext = await adminAuditContext(request, requestId);
-  let session = null as Awaited<ReturnType<typeof readSession>>;
+  const mutation = await beginAdminMutation(request, requestId, "admin.user.create");
+  if (!mutation.ok) return NextResponse.json({ error: mutation.error }, { status: mutation.status });
+  const { auditContext, session } = mutation;
   try {
-    if (!isSameOrigin(request)) {
-      await recordAdminAuditSafe({ action: "admin.user.create", outcome: "denied", metadata: { reason: "untrusted_origin" }, context: auditContext });
-      return NextResponse.json({ error: "请求来源不受信任" }, { status: 403 });
-    }
-    session = await readSession();
     if (!session) return NextResponse.json({ error: "请先登录" }, { status: 401 });
     if (!requireAdminRole(session, "owner")) {
       await recordAdminAuditSafe({ actor: session, action: "admin.user.create", outcome: "denied", metadata: { reason: "insufficient_role" }, context: auditContext });
