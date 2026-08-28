@@ -53,7 +53,7 @@ type MemoryStore = {
 
 type SupabaseConfig = { url: string; serviceRoleKey: string };
 
-export const latestBackendMigration = "0003_admin_i18n_analytics" as const;
+export const latestBackendMigration = "0004_admin_identity" as const;
 
 export class BackendMigrationError extends Error {
   readonly requiredMigration = latestBackendMigration;
@@ -561,30 +561,33 @@ export async function backendHealth() {
   const migrationProbe = JSON.stringify({ p_since: new Date().toISOString() });
   try {
     await Promise.all([
-      // 0003 adds these columns and RPCs. Probing both halves catches partial SQL runs too.
+      // Probe the latest analytics and administrator identity schema to catch partial SQL runs.
       supabaseRequest("analytics_events?select=id,currency,market,properties&limit=1", { method: "GET" }),
       supabaseRequest("rpc/admin_tracking_health", { method: "POST", body: migrationProbe }),
       supabaseRequest("rpc/admin_event_funnel", { method: "POST", body: migrationProbe }),
+      supabaseRequest("admin_profiles?select=id,email,role,active,mfa_required,session_version&limit=1", { method: "GET" }),
+      supabaseRequest("admin_sessions?select=id,token_hash,revoked_at,expires_at&limit=1", { method: "GET" }),
+      supabaseRequest("admin_audit_logs?select=id,action,outcome,created_at&limit=1", { method: "GET" }),
+      supabaseRequest("rpc/admin_resolve_session", { method: "POST", body: JSON.stringify({ p_token_hash: "health-probe-not-a-session" }) }),
     ]);
   } catch (error) {
     throw new BackendMigrationError(error);
   }
   return {
     database: "supabase" as const,
-    schema: "hardened-v3" as const,
+    schema: "identity-v4" as const,
     latestMigration: latestBackendMigration,
   };
 }
 
 export function getAdminCredentials() {
+  if (process.env.NODE_ENV === "production") return null;
   const configured = runtimeEnv();
   const username = configured.ADMIN_USERNAME;
   const password = configured.ADMIN_PASSWORD;
   const secret = configured.ADMIN_SESSION_SECRET;
   if (username && password && secret) {
-    if (process.env.NODE_ENV === "production" && (password.length < 16 || secret.length < 32)) return null;
     return { username, password, secret };
   }
-  if (process.env.NODE_ENV !== "production") return { username: "admin", password: "change-me-now", secret: "local-development-session-secret-change-before-deploy" };
-  return null;
+  return { username: "admin", password: "change-me-now", secret: "local-development-session-secret-change-before-deploy" };
 }

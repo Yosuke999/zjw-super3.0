@@ -16,9 +16,8 @@
 
 - `SUPABASE_URL`：Supabase 项目的 API URL
 - `SUPABASE_SERVICE_ROLE_KEY`：Supabase 的 `service_role` 密钥，只能配置在服务端，严禁添加 `NEXT_PUBLIC_` 前缀
-- `ADMIN_USERNAME`：管理员账号
-- `ADMIN_PASSWORD`：高强度管理员密码，建议至少 16 位
 - `ADMIN_SESSION_SECRET`：不少于 32 字节的随机字符串
+- `ADMIN_SESSION_SECONDS`：管理员会话寿命，默认 28800 秒（8 小时），允许 900–86400 秒
 - `IP_HASH_SECRET`：不少于 32 字节的独立随机字符串，用于不可逆限流指纹
 - `NEXT_PUBLIC_SITE_URL`：正式 HTTPS 域名，例如 `https://example.com`
 - `NEXT_PUBLIC_COMPANY_NAME`：真实法律主体名称
@@ -26,11 +25,34 @@
 - `NEXT_PUBLIC_COMPANY_ADDRESS`：注册地址
 - `NEXT_PUBLIC_BUSINESS_CONTACT`：商务与隐私联系方式
 
-不要把这些值写入 Git、源码或公开环境变量文件。管理员账号不开放自助注册。
+不要把这些值写入 Git、源码或公开环境变量文件。管理员账号不开放自助注册。`ADMIN_USERNAME` 与 `ADMIN_PASSWORD` 只用于未连接 Supabase 的本地回退模式，不再用于生产登录。
 
 本地开发时，可将项目根目录的 `.env.example` 复制为 `.env.local` 并填写 Supabase 信息；`.env.local` 已被 Git 忽略。
 
-本地开发在没有上述变量时可使用 `admin / change-me-now`。这个默认账号仅在开发环境生效，生产环境缺少密钥时会拒绝登录。
+本地开发在没有 Supabase 时可使用 `admin / change-me-now`。这个默认账号仅在开发环境生效，生产环境缺少身份配置或迁移时会拒绝登录。
+
+## 管理员身份初始化
+
+生产管理员使用 Supabase Auth 邮箱密码、TOTP MFA、数据库角色与可撤销服务端会话。完成 `0004_admin_identity.sql` 后，从可信的本地终端执行一次：
+
+1. 在 Supabase Dashboard 的 Authentication → Multi-Factor Authentication 中启用 TOTP；不要仅启用电话验证码。
+2. 在本地 `.env.local` 临时配置 `ADMIN_BOOTSTRAP_EMAIL`、`ADMIN_BOOTSTRAP_PASSWORD` 和 `ADMIN_BOOTSTRAP_NAME`。
+3. 运行 `npm run admin:bootstrap`，创建第一个 `owner`。引导脚本拒绝静默提升已存在的 Auth 用户。
+4. 立即从 `.env.local` 删除 `ADMIN_BOOTSTRAP_PASSWORD`，不要把引导密码配置到 Vercel。
+5. 使用引导邮箱和密码登录 `/admin`，扫描二维码并验证六位 TOTP 动态码。
+6. 再创建并验证至少一个备用 `owner`，避免唯一所有者丢失验证器后无法恢复。
+7. 后续管理员统一由后台“身份与审计”区域创建；默认强制 MFA。
+
+角色权限：
+
+- `owner`：管理员、角色、启停、MFA 策略、会话撤销、审计、导出与询价操作；
+- `manager`：导出客户数据并处理询价；
+- `operator`：查看看板并处理询价；
+- `viewer`：只读看板与询价。
+
+账号停用、角色变化、MFA 策略变化或所有者撤销会话后，现有应用会话立即失效。数据库触发器禁止停用或降级最后一个有效 `owner`。
+
+每位管理员都可在“安全设置”中验证当前密码并修改密码；成功后该账号的所有会话会立即撤销。管理员遗失验证器时，只能由另一位 `owner` 重置 MFA，重置后下次登录必须重新绑定。Owner 也可为其他管理员设置至少 14 位的临时密码；临时密码应通过独立安全渠道传递并要求对方登录后立即自助修改。
 
 ## 可选的新询价通知
 
@@ -44,10 +66,10 @@
 
 ## 上线前验收
 
-1. 在 Supabase SQL Editor 中按编号依次执行 `migrations/` 中的全部 SQL 文件，当前必须执行至 `0003_admin_i18n_analytics.sql`。
-2. 在 Vercel 中配置上述生产环境变量后重新部署。
-3. 打开 `/api/health`，确认返回 `database: "supabase"`、`schema: "hardened-v3"` 和 `latestMigration: "0003_admin_i18n_analytics"`。如果 `0003` 未执行或只执行了一部分，健康检查会返回 503。
-4. 打开 `/admin`，使用生产管理员账号登录。
+1. 在 Supabase SQL Editor 中按编号依次执行 `migrations/` 中的全部 SQL 文件，当前必须执行至 `0004_admin_identity.sql`。必须先迁移数据库再部署包含身份系统的应用代码，否则管理员接口会因缺表而返回 503。
+2. 在 Vercel 中配置上述生产环境变量后重新部署；生产环境不要配置 `ADMIN_USERNAME` 或 `ADMIN_PASSWORD`。
+3. 打开 `/api/health`，确认返回 `database: "supabase"`、`schema: "identity-v4"` 和 `latestMigration: "0004_admin_identity"`。迁移未执行或只执行一部分时健康检查会返回 503。
+4. 执行一次管理员引导，打开 `/admin`，完成邮箱密码与 TOTP MFA 登录。
 5. 从公开网站提交一条测试询价，确认后台能看到商品、客户、来源和提交页面。
 6. 修改询价状态并导出 CSV。
 7. 检查自定义域名 HTTPS、DNS 和 `NEXT_PUBLIC_SITE_URL`。
@@ -58,8 +80,10 @@
 
 - `request_limits` 会在限流 RPC 执行时自动删除 24 小时前的记录。
 - `cleanup_backend_data()` 默认删除 400 天前的匿名分析事件和 24 小时前的限流记录。建议在 Supabase Cron 中每天执行一次：`select * from public.cleanup_backend_data();`。
+- `cleanup_admin_sessions()` 默认删除过期或已撤销超过 30 天的管理员会话。建议在 Supabase Cron 中每天执行一次：`select public.cleanup_admin_sessions();`。
 - 询价属于业务记录，不会被自动删除；应根据公司合同、税务和隐私政策另行确定保留期限。
 - 管理员修改询价状态后，变更前后状态、管理员账号和时间会写入 `inquiry_status_history`。
+- 登录成功/失败、MFA 验证与重置、退出、改密、看板访问、客户数据导出、询价状态修改、管理员创建/修改和会话撤销会写入 `admin_audit_logs`。
 
 ## 生产监控
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createSession, isSameOrigin, sessionCookie, validateLogin } from "../../../backend/auth";
+import { beginAdminLogin, isSameOrigin, pendingMfaCookie, sessionCookie } from "../../../backend/auth";
+import { adminAuditContext } from "../../../backend/admin-identity";
 import { allowRequest } from "../../../backend/server";
 import { clientIp, fingerprint, logError, publicError, readJson, text } from "../../../backend/http";
 
@@ -12,13 +13,21 @@ export async function POST(request: Request) {
     const rateKey = `admin-login:${await fingerprint(clientIp(request), "admin-login")}`;
     if (!(await allowRequest(rateKey, 6, 15 * 60))) return NextResponse.json({ error: "登录尝试过多，请 15 分钟后再试" }, { status: 429 });
     const body = await readJson(request, 4_000);
-    const result = await validateLogin(text(body.username, 100), text(body.password, 200));
+    const result = await beginAdminLogin(
+      text(body.email ?? body.username, 320), text(body.password, 200),
+      await adminAuditContext(request, requestId),
+    );
     if (!result.ok) {
       const message = result.configurationError ? "管理员账号尚未配置" : "账号或密码不正确";
       return NextResponse.json({ error: message }, { status: result.configurationError ? 503 : 401 });
     }
-    const response = NextResponse.json({ ok: true, user: { username: result.username } });
-    response.cookies.set(await sessionCookie(await createSession(result.username)));
+    if (result.next === "mfa") {
+      const response = NextResponse.json({ ok: true, next: "mfa", enrollment: result.enrollment });
+      response.cookies.set(pendingMfaCookie(result.pendingValue));
+      return response;
+    }
+    const response = NextResponse.json({ ok: true, next: "complete", user: result.session });
+    response.cookies.set(sessionCookie(result.value, result.maxAge));
     return response;
   } catch (error) {
     const failure = publicError(error, "暂时无法登录");

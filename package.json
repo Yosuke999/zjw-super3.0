@@ -12,10 +12,12 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "test": "npm run test:phase2 && npm run test:backend",
     "test:phase2": "node --experimental-strip-types --test tests/phase-two.test.ts",
-    "test:backend": "node --experimental-strip-types --test tests/backend.test.ts"
+    "test:backend": "node --experimental-strip-types --test tests/backend.test.ts",
+    "admin:bootstrap": "node --env-file=.env.local scripts/bootstrap-admin.mjs"
   },
   "dependencies": {
-    "next": "16.2.6",
+    "@supabase/supabase-js": "^2.112.4",
+    "next": "16.3.3",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
@@ -25,7 +27,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.3.3",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3"
   },
