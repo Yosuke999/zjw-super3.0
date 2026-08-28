@@ -33,7 +33,7 @@
 
 ## 管理员身份初始化
 
-生产管理员使用 Supabase Auth 邮箱密码、TOTP MFA、数据库角色与可撤销服务端会话。完成 `0004_admin_identity.sql` 后，从可信的本地终端执行一次：
+生产管理员使用 Supabase Auth 邮箱密码、TOTP MFA、数据库角色与可撤销服务端会话。依次完成 `0004_admin_identity.sql` 与 `0004_admin_identity_audit.sql` 后，从可信的本地终端执行一次：
 
 1. 在 Supabase Dashboard 的 Authentication → Multi-Factor Authentication 中启用 TOTP；不要仅启用电话验证码。
 2. 在本地 `.env.local` 临时配置 `ADMIN_BOOTSTRAP_EMAIL`、`ADMIN_BOOTSTRAP_PASSWORD` 和 `ADMIN_BOOTSTRAP_NAME`。
@@ -41,7 +41,7 @@
 4. 立即从 `.env.local` 删除 `ADMIN_BOOTSTRAP_PASSWORD`，不要把引导密码配置到 Vercel。
 5. 使用引导邮箱和密码登录 `/admin`，扫描二维码并验证六位 TOTP 动态码。
 6. 再创建并验证至少一个备用 `owner`，避免唯一所有者丢失验证器后无法恢复。
-7. 后续管理员统一由后台“身份与审计”区域创建；默认强制 MFA。
+7. 后续管理员统一由后台“管理员身份”区域创建；默认强制 MFA。完整日志在后台“审计日志”页面按管理员、动作和日期筛选。
 
 角色权限：
 
@@ -66,9 +66,9 @@
 
 ## 上线前验收
 
-1. 在 Supabase SQL Editor 中按编号依次执行 `migrations/` 中的全部 SQL 文件，当前必须执行至 `0004_admin_identity.sql`。必须先迁移数据库再部署包含身份系统的应用代码，否则管理员接口会因缺表而返回 503。
+1. 在 Supabase SQL Editor 中按文件名顺序执行 `migrations/` 中的全部 SQL 文件，当前必须执行至 `0004_admin_identity_audit.sql`。必须先迁移数据库再部署包含身份与审计系统的应用代码，否则管理员接口会因缺表而返回 503。
 2. 在 Vercel 中配置上述生产环境变量后重新部署；生产环境不要配置 `ADMIN_USERNAME` 或 `ADMIN_PASSWORD`。
-3. 打开 `/api/health`，确认返回 `database: "supabase"`、`schema: "identity-v4"` 和 `latestMigration: "0004_admin_identity"`。迁移未执行或只执行一部分时健康检查会返回 503。
+3. 打开 `/api/health`，确认返回 `database: "supabase"`、`schema: "identity-audit-v4"` 和 `latestMigration: "0004_admin_identity_audit"`。迁移未执行或只执行一部分时健康检查会返回 503。
 4. 执行一次管理员引导，打开 `/admin`，完成邮箱密码与 TOTP MFA 登录。
 5. 从公开网站提交一条测试询价，确认后台能看到商品、客户、来源和提交页面。
 6. 修改询价状态并导出 CSV。
@@ -81,6 +81,8 @@
 - `request_limits` 会在限流 RPC 执行时自动删除 24 小时前的记录。
 - `cleanup_backend_data()` 默认删除 400 天前的匿名分析事件和 24 小时前的限流记录。建议在 Supabase Cron 中每天执行一次：`select * from public.cleanup_backend_data();`。
 - `cleanup_admin_sessions()` 默认删除过期或已撤销超过 30 天的管理员会话。建议在 Supabase Cron 中每天执行一次：`select public.cleanup_admin_sessions();`。
+- `admin_audit_logs` 是仅追加日志，记录登录成功/失败、退出与会话撤销、询价状态修改、CSV 导出以及管理员创建、停用、角色调整。每条日志包含操作人、北京时间、服务端请求编号、结果和不可逆 IP 指纹；不保存完整 IP 地址，也不允许修改或删除历史记录。
+- 审计日志仅对 `owner` 开放，可在 `/admin/audit` 按管理员、动作、开始日期和结束日期筛选。
 - 询价属于业务记录，不会被自动删除；应根据公司合同、税务和隐私政策另行确定保留期限。
 - 管理员修改询价状态后，变更前后状态、管理员账号和时间会写入 `inquiry_status_history`。
 - 登录成功/失败、MFA 验证与重置、退出、改密、看板访问、客户数据导出、询价状态修改、管理员创建/修改和会话撤销会写入 `admin_audit_logs`。

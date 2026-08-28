@@ -30,14 +30,26 @@ export type AdminUserSummary = {
 
 export type AdminAuditEvent = {
   id: string;
+  actorId: string;
   actorEmail: string;
   action: string;
   targetType: string;
   targetId: string;
   outcome: "success" | "failure" | "denied";
   requestId: string;
+  ipFingerprint: string;
   metadata: Record<string, string | number | boolean>;
   createdAt: string;
+};
+
+export type AdminAuditPage = {
+  events: AdminAuditEvent[];
+  administrators: Array<{ id: string; email: string; displayName: string }>;
+  actions: string[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 };
 
 const adminRoleRank: Record<AdminRole, number> = { viewer: 0, operator: 1, manager: 2, owner: 3 };

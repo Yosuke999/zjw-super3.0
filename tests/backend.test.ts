@@ -283,6 +283,20 @@ test("identity migration contains revocable sessions, owner protection, RLS and 
   ]) assert.ok(sql.includes(required), required);
 });
 
+test("audit migration makes logs append-only and supports administrator, action and date filters", () => {
+  const sql = readFileSync(new URL("../migrations/0004_admin_identity_audit.sql", import.meta.url), "utf8").toLowerCase();
+  for (const required of [
+    "alter table public.admin_audit_logs",
+    "admin_audit_actor_created_idx",
+    "admin_audit_action_created_idx",
+    "create or replace function public.prevent_admin_audit_mutation",
+    "create or replace function public.admin_audit_health",
+    "before update or delete on public.admin_audit_logs",
+    "revoke update, delete, truncate on table public.admin_audit_logs from service_role",
+    "grant select, insert on table public.admin_audit_logs to service_role",
+  ]) assert.ok(sql.includes(required), required);
+});
+
 test("administrator session tokens are stored as irreversible SHA-256 hashes", async () => {
   const token = "a".repeat(64);
   const hash = await sessionTokenHash(token);
@@ -306,15 +320,16 @@ test("production health probe requires every identity migration table and RPC", 
     };
     assert.deepEqual(await backendHealth(), {
       database: "supabase",
-      schema: "identity-v4",
-      latestMigration: "0004_admin_identity",
+      schema: "identity-audit-v4",
+      latestMigration: "0004_admin_identity_audit",
     });
     assert.ok(requestedPaths.some((path) => path.includes("analytics_events?select=id,currency,market,properties")));
     assert.ok(requestedPaths.some((path) => path.endsWith("/rpc/admin_tracking_health")));
     assert.ok(requestedPaths.some((path) => path.endsWith("/rpc/admin_event_funnel")));
     assert.ok(requestedPaths.some((path) => path.includes("admin_profiles?select=id,email,role,active,mfa_required,session_version")));
     assert.ok(requestedPaths.some((path) => path.includes("admin_sessions?select=id,token_hash,revoked_at,expires_at")));
-    assert.ok(requestedPaths.some((path) => path.includes("admin_audit_logs?select=id,action,outcome,created_at")));
+    assert.ok(requestedPaths.some((path) => path.includes("admin_audit_logs?select=id,actor_id,action,outcome,request_id,ip_hash,created_at")));
+    assert.ok(requestedPaths.some((path) => path.endsWith("/rpc/admin_audit_health")));
     assert.ok(requestedPaths.some((path) => path.endsWith("/rpc/admin_resolve_session")));
 
     globalThis.fetch = async (input) => {
@@ -327,7 +342,7 @@ test("production health probe requires every identity migration table and RPC", 
       backendHealth(),
       (error) => error instanceof Error
         && error.name === "BackendMigrationError"
-        && /0004_admin_identity/.test(error.message)
+        && /0004_admin_identity_audit/.test(error.message)
         && /Supabase 404: function is missing/.test(error.message),
     );
   } finally {

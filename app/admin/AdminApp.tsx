@@ -26,7 +26,7 @@ import {
   type AdminLanguage,
 } from "./i18n";
 
-type IconName = "dashboard" | "inquiries" | "refresh" | "search" | "eye" | "users" | "quote" | "conversion" | "logout" | "arrow" | "close";
+type IconName = "dashboard" | "inquiries" | "refresh" | "search" | "eye" | "users" | "audit" | "quote" | "conversion" | "logout" | "arrow" | "close";
 const adminPreferenceKey = "central-asia-trade.admin-preferences";
 
 function Icon({ name }: { name: IconName }) {
@@ -38,6 +38,7 @@ function Icon({ name }: { name: IconName }) {
     search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
     eye: <><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></>,
     users: <><circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M16 5.5a3 3 0 0 1 0 5.5M17 14c2.5.5 4 2.3 4 5"/></>,
+    audit: <><path d="M5 3h14v18H5z"/><path d="M9 8h6M9 12h6M9 16h4"/></>,
     quote: <><path d="M4 5h16v12H8l-4 4V5Z"/><path d="m8 11 2 2 5-5"/></>,
     conversion: <><path d="M4 19 10 13l4 3 6-9"/><path d="M15 7h5v5"/></>,
     logout: <><path d="M10 5H4v14h6M14 8l4 4-4 4M18 12H8"/></>,
@@ -402,7 +403,7 @@ function IdentityPanel({ currentUser }: { currentUser: { userId: string; email: 
           <small>最后登录：{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString("zh-CN") : "尚未登录"}</small>
         </article>)}
       </div>
-      <div className="admin-audit-list"><h3>最近审计记录</h3>{audit.length ? audit.map((event) => <article key={event.id}><time>{new Date(event.createdAt).toLocaleString("zh-CN")}</time><strong>{event.action}</strong><span>{event.actorEmail || "系统"}</span><em className={`outcome-${event.outcome}`}>{event.outcome}</em><small>{event.targetId}</small></article>) : <p>暂无审计记录</p>}</div>
+      <div className="admin-audit-list"><h3>最近审计记录 <a href="/admin/audit">查看全部与筛选 →</a></h3>{audit.length ? audit.map((event) => <article key={event.id}><time>{new Date(event.createdAt).toLocaleString("zh-CN")}</time><strong>{event.action}</strong><span>{event.actorEmail || "系统"}</span><em className={`outcome-${event.outcome}`}>{event.outcome}</em><small>{event.targetId}</small></article>) : <p>暂无审计记录</p>}</div>
     </>}
   </section>;
 }
@@ -476,7 +477,7 @@ export default function AdminApp() {
   const canExport = currentUser ? adminRoleAllows(currentUser.role, "manager") : false;
   const isOwner = currentUser?.role === "owner";
   return <main className="admin-shell" lang={language}>
-    <aside className="admin-sidebar"><Brand copy={copy}/><nav><span>{copy.operationsWorkspace}</span><a className="active" href="#overview"><Icon name="dashboard"/><b>{copy.overview}</b></a><a href="#inquiries"><Icon name="inquiries"/><b>{copy.inquiryManagement}</b><em>{snapshot.metrics.inquiries}</em></a><a href="#security"><Icon name="users"/><b>安全设置</b></a>{isOwner && <a href="#identity"><Icon name="users"/><b>身份与审计</b></a>}</nav><div className="admin-sidebar-foot"><span>{copy.currentAdmin} · {currentUser ? roleLabels[currentUser.role] : "—"}</span><strong>{currentUser?.displayName || currentUser?.email || copy.administrator}</strong><button type="button" onClick={() => void logout()}><Icon name="logout"/>{copy.logout}</button></div></aside>
+    <aside className="admin-sidebar"><Brand copy={copy}/><nav><span>{copy.operationsWorkspace}</span><a className="active" href="#overview"><Icon name="dashboard"/><b>{copy.overview}</b></a><a href="#inquiries"><Icon name="inquiries"/><b>{copy.inquiryManagement}</b><em>{snapshot.metrics.inquiries}</em></a><a href="#security"><Icon name="users"/><b>安全设置</b></a>{isOwner && <><a href="#identity"><Icon name="users"/><b>管理员身份</b></a><a href="/admin/audit"><Icon name="audit"/><b>审计日志</b></a></>}</nav><div className="admin-sidebar-foot"><span>{copy.currentAdmin} · {currentUser ? roleLabels[currentUser.role] : "—"}</span><strong>{currentUser?.displayName || currentUser?.email || copy.administrator}</strong><button type="button" onClick={() => void logout()}><Icon name="logout"/>{copy.logout}</button></div></aside>
     <section className="admin-workspace">
       <header className="admin-topbar"><div><span>{copy.overviewEyebrow}</span><h1>{copy.overviewTitle}</h1><p>{copy.overviewIntro}</p></div><div className="admin-top-actions"><LocaleControls {...localeProps} compact/><label className="admin-period-control"><span>{copy.period}</span><select value={days} onChange={(event) => { const value = Number(event.target.value); setDays(value); setPage(1); void load({ days: value, page: 1 }); }}><option value={7}>{copy.last7Days}</option><option value={30}>{copy.last30Days}</option><option value={90}>{copy.last90Days}</option></select></label><button type="button" onClick={() => void load()} disabled={loading}><Icon name="refresh"/>{loading ? copy.refreshing : copy.refresh}</button></div></header>
       <div className="admin-content" id="overview">
