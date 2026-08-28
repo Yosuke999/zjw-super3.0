@@ -2,6 +2,50 @@ export const inquiryStatuses = ["new", "contacted", "quoting", "won", "invalid"]
 
 export type InquiryStatus = (typeof inquiryStatuses)[number];
 
+export const adminRoles = ["owner", "manager", "operator", "viewer"] as const;
+export type AdminRole = (typeof adminRoles)[number];
+
+export type AdminSession = {
+  sessionId: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  role: AdminRole;
+  mfaRequired: boolean;
+  expiresAt: number;
+};
+
+export type AdminUserSummary = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: AdminRole;
+  active: boolean;
+  mfaRequired: boolean;
+  mfaEnrolled: boolean;
+  lastLoginAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminAuditEvent = {
+  id: string;
+  actorEmail: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  outcome: "success" | "failure" | "denied";
+  requestId: string;
+  metadata: Record<string, string | number | boolean>;
+  createdAt: string;
+};
+
+const adminRoleRank: Record<AdminRole, number> = { viewer: 0, operator: 1, manager: 2, owner: 3 };
+
+export function adminRoleAllows(actual: AdminRole, required: AdminRole) {
+  return adminRoleRank[actual] >= adminRoleRank[required];
+}
+
 export const analyticsEventNames = [
   "page_view",
   "product_view",
